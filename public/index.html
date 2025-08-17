@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Country World Cup</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <!-- =================== Steuerzentrale =================== -->
+    <div id="control-panel">
+        <h3>Turnier-Setup</h3>
+        <div id="country-selectors">
+            <select class="country-input"></select>
+            <select class="country-input"></select>
+            <select class="country-input"></select>
+            <select class="country-input"></select>
+            <select class="country-input"></select>
+            <select class="country-input"></select>
+            <select class="country-input"></select>
+            <select class="country-input"></select>
+        </div>
+        <!-- 🕒 Zeiteinstellungen -->
+        <div id="time-settings">
+            <label>
+                Runden-Dauer (Sek.):
+                <input type="number" id="round-time" min="5" value="60">
+            </label>
+            <label>
+                Overtime-Dauer (Sek.):
+                <input type="number" id="overtime-time" min="5" value="30">
+            </label>
+        </div>
+        <div id="top-countries" class="top-countries">
+            <h4>TOP 10 LÄNDER</h4>
+            <ol id="top10-list" class="top10-list">
+                <!-- per JS befüllt -->
+            </ol>
+        </div>
+
+        <div class="cp-actions">
+            <label><input type="checkbox" id="shuffle"> Zufällig verteilen</label>
+            <button id="start-tournament">Start</button>
+        </div>
+        <button id="music-toggle" class="music-toggle" aria-pressed="false" title="Musik an/aus">🎵 Musik</button>
+        <audio id="bg-music" src="assets/bg-music.mp3" preload="auto" loop></audio>
+    </div>
+
+    <!-- ============== Turnier-Zusammenfassung (Modal) ============== -->
+    <!-- ============== Gewinner-Modal ============== -->
+    <div id="tournament-modal" class="modal hidden">
+        <div class="modal-content modal-winner">
+            <div class="modal-title">🏆 Gewinner</div>
+
+            <div class="winner-line big">
+                <img id="modal-winner-flag" src="" alt="">
+                <strong id="modal-winner-name">—</strong>
+            </div>
+
+            <div class="top3">
+                <div class="top3-title">Top 3 Supporter</div>
+                <ol id="modal-top3" class="top3-list"><!-- per JS --></ol>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="overlay">
+        <!-- Title -->
+        <div class="title">
+            <span>WORLD CUP</span><br />
+            <span>LIVE BATTLE</span>
+            <div class="title-line"></div>
+        </div>
+
+        <!-- Partikel-Hintergrund -->
+        <div class="particles">
+            <canvas id="px-left"></canvas>
+            <canvas id="px-right"></canvas>
+        </div>
+
+
+        <!-- Battle Arena -->
+        <div class="battle_arena">
+            <!-- Linke Karte -->
+            <div class="left_card" id="card-left">
+                <div class="Flagge">
+                    <img id="flag-left" src="flags/de.png" alt="Germany Flag">
+                </div>
+                <div class="Infos">
+                    <div class="Landname" id="name-left">GERMANY</div>
+                    <div class="Punktestand" id="score-left">0</div>
+                </div>
+            </div>
+
+            <!-- Uhr -->
+            <div class="timer" id="timer">
+                <span id="timer-text"></span>
+            </div>
+
+            <!-- Rechte Karte -->
+            <div class="left_card" id="card-right">
+                <div class="Infos_right">
+                    <div class="Landname" id="name-right">BELGIEN</div>
+                    <div class="Punktestand" id="score-right">0</div>
+                </div>
+                <div class="Flagge">
+                    <img id="flag-right" src="flags/be.png" alt="Belgium Flag">
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Turnierbaum -->
+        <!-- Bracket (ohne Linien) -->
+        <section class="bracket">
+            <div class="bracket-header">
+                <div>VIERTELFINALE</div>
+                <div>HALBFINALE</div>
+                <div>FINALE</div>
+            </div>
+
+            <div class="bracket-body">
+                <!-- Spalte: Viertelfinale (8) -->
+                <div class="col qf">
+                    <div class="team-box"><img src="flags/de.png" alt=""><span>GERMANY</span></div>
+                    <div class="team-box"><img src="flags/be.png" alt=""><span>BELGIUM</span></div>
+                    <div class="team-box"><img src="flags/fr.png" alt=""><span>FRANCE</span></div>
+                    <div class="team-box"><img src="flags/es.png" alt=""><span>SPAIN</span></div>
+                    <div class="team-box"><img src="flags/it.png" alt=""><span>ITALY</span></div>
+                    <div class="team-box"><img src="flags/nl.png" alt=""><span>NETHERLANDS</span></div>
+                    <div class="team-box"><img src="flags/gb.png" alt=""><span>ENGLAND</span></div>
+                    <div class="team-box"><img src="flags/pt.png" alt=""><span>PORTUGAL</span></div>
+                </div>
+
+                <!-- Spalte: Halbfinale (4) -->
+                <div class="col sf">
+                    <div class="team-box"><span>—</span></div>
+                    <div class="team-box"><span>—</span></div>
+                    <div class="team-box"><span>—</span></div>
+                    <div class="team-box"><span>—</span></div>
+                </div>
+
+                <!-- Spalte: Finale (2) -->
+                <div class="col final">
+                    <div class="team-box"><span>—</span></div>
+                    <div class="team-box"><span>—</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Regeln / Scoring-Bar (Marquee) -->
+        <section class="rulesbar" aria-label="Scoring Regeln">
+            <div class="rules-track" id="rules-track">
+                <div class="rule">
+                    <span class="icon">💬</span>
+                    <span class="label"><strong>Kommentar</strong> = <span class="pill pill-blue">+1</span> Punkt</span>
+                </div>
+
+                <div class="rule">
+                    <span class="icon">➕</span>
+                    <span class="label"><strong>Follow</strong> = <span class="pill pill-blue">+5</span> Punkte</span>
+                </div>
+
+                <div class="rule">
+                    <span class="icon">🟡</span>
+                    <span class="label"><strong>1 Coin</strong> = <span class="pill pill-gold">+10</span> Punkte</span>
+                </div>
+
+                <!-- 🆕 Likes-Karte -->
+                <div class="rule">
+                    <span class="icon">👍</span>
+                    <span class="label"><strong>Like</strong> = <span class="pill pill-blue">+1</span> Punkt</span>
+                </div>
+            </div>
+        </section>
+
+
+
+        <section class="podium" aria-label="Top 3">
+            <div class="podium-track">
+
+                <!-- 2. Platz -->
+                <div class="slot second">
+                    <div class="rank">2</div>
+                    <div class="pedestal">
+                        <img src="avatars/user2.jpg" alt="User 2">
+                        <span class="name">@silver_fox</span>
+                    </div>
+                </div>
+
+                <!-- 1. Platz -->
+                <div class="slot first">
+                    <div class="rank">1</div>
+                    <div class="pedestal">
+                        <img src="avatars/user1.jpg" alt="User 1">
+                        <span class="name">@golden_king</span>
+                    </div>
+                </div>
+
+                <!-- 3. Platz -->
+                <div class="slot third">
+                    <div class="rank">3</div>
+                    <div class="pedestal">
+                        <img src="avatars/user3.jpg" alt="User 3">
+                        <span class="name">@bronzie</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+
+
+        <!-- Endless scrolling background (original + mirrored copy) -->
+        <div class="bg-conveyor" aria-hidden="true">
+            <img src="bg.png" class="bg-seg" id="bgA" alt="">
+            <img src="bg_flipped.png" class="bg-seg" id="bgB" alt="">
+        </div>
+
+        <!-- Ignorieren hat nichts damit zu tun!-->
+        <img src="bg2.png" alt="Hintergrund" class="background2" />
+
+
+    </div>
+
+    <script>
+        // ===== Split-Particles: Left (blue) & Right (orange) =====
+        (function () {
+            const left = document.getElementById('px-left');
+            const right = document.getElementById('px-right');
+            if (!left || !right) return;
+
+            // ⬇⬇ Geschwindigkeit hier einstellen (px pro Sekunde)
+            const SPEED_Y = [40, 80];          // z.B. [40,80] = langsamer, [100,160] = schneller
+            const DRIFT_X = [-12, 12];
+            const SIZE = [2, 4];
+            const DENSITY = 30;                // Partikelanzahl je Seite
+            const FADE_BAND = 0.18;             // unterer Fade-Anteil (0.18 = 18% der Höhe)
+
+            // Farben klar getrennt: links blau, rechts orange
+            const COLORS_LEFT = [[0, 183, 255], [60, 200, 255], [120, 220, 255]];
+            const COLORS_RIGHT = [[255, 120, 20], [255, 160, 40], [255, 95, 0]]; // satteres Orange
+
+            function setupCanvas(cv) {
+                const rect = cv.getBoundingClientRect();
+                const dpr = Math.max(1, window.devicePixelRatio || 1);
+                cv.width = Math.floor(rect.width * dpr);
+                cv.height = Math.floor(rect.height * dpr);
+                const ctx = cv.getContext('2d');
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // wir zeichnen in CSS-Pixeln
+                ctx.globalCompositeOperation = 'lighter'; // verstärkt Glow/Farben
+                return { ctx, dpr, w: rect.width, h: rect.height };
+            }
+
+            function makeSystem(canvas, palette) {
+                let { ctx, w, h } = setupCanvas(canvas);
+                function resize() { ({ ctx, w, h } = setupCanvas(canvas)); }
+                window.addEventListener('resize', resize);
+
+                const P = [];
+                const rand = (a, b) => a + Math.random() * (b - a);
+                const pick = () => {
+                    const c = palette[(Math.random() * palette.length) | 0];
+                    // kleine Alpha-Varianz
+                    return `rgba(${c[0]},${c[1]},${c[2]},${rand(0.6, 1)})`;
+                };
+                function spawn(y = -rand(4, 16)) { // oberhalb spawnen
+                    P.push({
+                        x: rand(8, w - 8),
+                        y,
+                        vx: rand(DRIFT_X[0], DRIFT_X[1]),
+                        vy: rand(SPEED_Y[0], SPEED_Y[1]),
+                        s: rand(SIZE[0], SIZE[1]),
+                        col: pick()
+                    });
+                }
+                // Startverteilung
+                for (let i = 0; i < DENSITY; i++) spawn(rand(0, h));
+
+                let last = performance.now();
+                function tick(now) {
+                    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+                    ctx.clearRect(0, 0, w, h);
+
+                    // Nachfüllen, falls Lücken
+                    while (P.length < DENSITY) spawn();
+
+                    const fadeStart = h * (1 - FADE_BAND);
+
+                    for (let i = 0; i < P.length; i++) {
+                        const p = P[i];
+                        p.x += p.vx * dt;
+                        p.y += p.vy * dt;
+                        if (p.x < 0) p.x = 0; if (p.x > w - p.s) p.x = w - p.s;
+
+                        // Unten Fade-Out
+                        let alpha = 1;
+                        if (p.y > fadeStart) {
+                            const t = Math.min(1, (p.y - fadeStart) / (h - fadeStart));
+                            alpha = 1 - t;
+                        }
+
+                        ctx.globalAlpha = alpha;
+                        ctx.fillStyle = p.col;
+                        ctx.fillRect(p.x, p.y, p.s, p.s);
+
+                        // Unten -> oben neu
+                        if (p.y > h + 8) {
+                            P[i] = P[P.length - 1];
+                            P.pop();
+                            spawn();
+                            i--;
+                        }
+                    }
+                    ctx.globalAlpha = 1;
+                    requestAnimationFrame(tick);
+                }
+                requestAnimationFrame(tick);
+
+                return { resize };
+            }
+
+            // Zwei komplett getrennte Systeme:
+            const sysL = makeSystem(left, COLORS_LEFT);
+            const sysR = makeSystem(right, COLORS_RIGHT);
+            window.addEventListener('resize', () => { sysL.resize(); sysR.resize(); });
+        })();
+
+    </script>
+
+    <script>
+        (function () {
+            const A = document.getElementById('bgA');
+            const B = document.getElementById('bgB');
+            if (!A || !B) return;
+
+            let w = 1080; // Breite der Segmente
+            const root = document.getElementById('overlay');
+
+            let xA = 0;    // Startposition von A
+            let xB = w;    // Startposition von B (rechts daneben)
+            const SPEED = 20; // px pro Sekunde, nach links
+            let last = performance.now();
+
+            function size() {
+                w = root?.clientWidth || 1080;
+                xA = 0;
+                xB = w;
+                apply();
+            }
+
+            function apply() {
+                A.style.transform = `translateX(${xA}px)`;
+                B.style.transform = `translateX(${xB}px)`;
+            }
+
+            function tick(now) {
+                const dt = Math.min(0.05, (now - last) / 1000);
+                last = now;
+
+                // beide gleichmäßig nach links verschieben
+                xA -= SPEED * dt;
+                xB -= SPEED * dt;
+
+                // wenn ein Segment komplett links raus ist → nach ganz rechts setzen
+                if (xA <= -w) xA = xB + w;
+                if (xB <= -w) xB = xA + w;
+
+                apply();
+                requestAnimationFrame(tick);
+            }
+
+            window.addEventListener('resize', size);
+            size();
+            requestAnimationFrame(tick);
+        })();
+    </script>
+    <script>
+        // Nahtloser Endlos-Scroll für die Regeln
+        (function () {
+            const track = document.getElementById('rules-track');
+            if (!track) return;
+
+            // Inhalt einmal duplizieren, damit wir von 0% nach -50% scrollen können
+            track.innerHTML += track.innerHTML;
+
+            // Optional: Speed dynamisch anpassen, wenn du möchtest (z. B. abhängig von Kartenzahl)
+            // Beispiel: je mehr Karten, desto länger die Runde
+            // const cards = track.children.length; // nach dem Duplizieren
+            // track.style.animationDuration = Math.max(18, cards * 3) + 's';
+        })();
+    </script>
+    <script>
+        (function () {
+            const audio = document.getElementById('bg-music');
+            const btn = document.getElementById('music-toggle');
+            if (!audio || !btn) return;
+
+            // Start-Lautstärke (leise)
+            audio.volume = 0.25;
+
+            async function tryPlay() {
+                try {
+                    await audio.play();
+                    btn.setAttribute('aria-pressed', 'true');
+                    btn.textContent = '🔊 Musik';
+                } catch (e) {
+                    // Autoplay blockiert -> Button zeigt "Musik"
+                    btn.setAttribute('aria-pressed', 'false');
+                    btn.textContent = '🎵 Musik';
+                }
+            }
+
+            // 1) Beim ersten User-Input versuchen zu starten
+            let armed = true;
+            const armers = ['pointerdown', 'keydown', 'touchstart'];
+            armers.forEach(ev => window.addEventListener(ev, () => {
+                if (armed) {
+                    armed = false;
+                    tryPlay();
+                }
+            }, { once: true, passive: true }));
+
+            // 2) Toggle-Button
+            btn.addEventListener('click', async () => {
+                if (audio.paused) {
+                    await tryPlay();
+                } else {
+                    audio.pause();
+                    btn.setAttribute('aria-pressed', 'false');
+                    btn.textContent = '🎵 Musik';
+                }
+            });
+
+            // 3) Falls Tab wieder sichtbar wird und Musik „an“ war, weiter spielen
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && btn.getAttribute('aria-pressed') === 'true') {
+                    audio.play().catch(() => { });
+                }
+            });
+
+            // Optional: leiser Fade-In beim Start
+            function fadeIn(target = 0.25, ms = 800) {
+                const step = (target - audio.volume) / (ms / 50);
+                const iv = setInterval(() => {
+                    audio.volume = Math.min(target, audio.volume + step);
+                    if (audio.volume >= target) clearInterval(iv);
+                }, 50);
+            }
+            audio.addEventListener('play', () => {
+                if (audio.volume < 0.2) fadeIn(0.25, 600);
+            });
+        })();
+    </script>
+
+    <script src="app.js"></script>
+
+
+
+
+
+</body>
+
+</html>

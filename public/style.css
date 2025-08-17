@@ -1,0 +1,1220 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@800&display=swap');
+
+/* Base */
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: black;
+    height: 100%;
+}
+
+#overlay {
+    width: 1080px;
+    height: 1920px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+}
+
+.background {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+}
+
+.background2 {
+    position: relative;
+    inset: 0;
+    width: 1080px;
+    height: 1920px;
+    object-fit: cover;
+    z-index: 0;
+}
+
+/* Titel */
+.title {
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 80px;
+    line-height: 1.1;
+    text-align: center;
+    color: #fed44a;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(255, 211, 92, .8), 0 0 20px rgba(255, 211, 92, .6), 0 0 40px rgba(255, 211, 92, .4);
+    z-index: 1;
+}
+
+.title-line {
+    margin-top: 30px;
+    width: 800px;
+    height: 3px;
+    background: linear-gradient(to right, rgba(0, 183, 255, 0) 0%, rgba(0, 183, 255, 1) 10%, rgba(0, 183, 255, 1) 90%, rgba(0, 183, 255, 0) 100%);
+    box-shadow: 0 0 10px rgba(0, 183, 255, .8), 0 0 20px rgba(0, 183, 255, .6);
+    border-radius: 50%;
+}
+
+/* Timer mittig und über den Cards */
+/* === TIMER: kleiner, gefüllt, dicker Glow, sichtbare Animation === */
+:root {
+    --glow-blue: #00b7ff;
+}
+
+.timer {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 180px;
+    /* kleiner als vorher */
+    height: 180px;
+    border-radius: 50%;
+
+    /* fester Hintergrund (leicht „glasig“, aber NICHT transparent) */
+    background: rgba(12, 28, 52, 0.95);
+
+    /* 3px Leuchtrand + starker Außen-Glow */
+    border: 3px solid var(--glow-blue);
+    box-shadow:
+        0 0 10px rgba(0, 183, 255, .9),
+        0 0 24px rgba(0, 183, 255, .65),
+        inset 0 0 18px rgba(255, 255, 255, .06);
+
+    display: grid;
+    place-items: center;
+    z-index: 5;
+}
+
+/* Sichtbarer „Sweep“-Lichtring, der rotiert */
+.timer::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    /* läuft direkt über dem Rand */
+    border-radius: 50%;
+    /* helles, deutliches Segment */
+    background: conic-gradient(from 0deg,
+            rgba(0, 183, 255, 0) 0 40%,
+            rgba(255, 255, 255, .0) 40% 58%,
+            rgba(0, 183, 255, 1) 58% 62%,
+            /* schmaler, sehr heller Sweep */
+            rgba(0, 183, 255, 0) 62% 100%);
+    /* auf einen Ring maskieren (ca. 3px dick) */
+    -webkit-mask:
+        radial-gradient(circle, transparent 73%, #000 74%)
+        /* Innenloch */
+        ,
+        radial-gradient(circle, #000 99%, #000 100%);
+    /* Außenkante */
+    mask:
+        radial-gradient(circle, transparent 73%, #000 74%),
+        radial-gradient(circle, #000 99%, #000 100%);
+    mix-blend-mode: screen;
+    animation: spin 4s linear infinite;
+    /* schneller -> besser sichtbar */
+    opacity: .95;
+}
+
+/* zusätzlicher sanfter, breiter Halo außen */
+.timer::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    box-shadow:
+        0 0 18px rgba(0, 183, 255, .5),
+        0 0 42px rgba(0, 183, 255, .35),
+        0 0 70px rgba(0, 183, 255, .25);
+    pointer-events: none;
+}
+
+.timer span {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 40px;
+    /* leicht kleiner, damit’s locker sitzt */
+    color: #e9f7ff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, .25);
+}
+
+/* Animation bleibt gleich, nur schneller (s.o.) */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* Battle-Arena: volle Breite des Overlays, innen 40px Abstand,
+   Kinder in einer Reihe (links Card – Timer – rechts Card) */
+.battle_arena {
+    position: absolute;
+    top: 370px;
+    /* wo die Arena beginnen soll – anpassen, wenn nötig */
+    left: 0;
+    width: 100%;
+    height: 300px;
+    /* reine Arbeits-Höhe für die Cards; nach Bedarf ändern */
+
+    box-sizing: border-box;
+    padding: 0 40px;
+    /* ⬅️ Innenabstand links/rechts */
+
+    display: flex;
+    /* Kinder in einer Reihe */
+    align-items: center;
+    /* vertikal zentriert innerhalb der Arena */
+    justify-content: space-between;
+    /* links Card – Mitte Timer – rechts Card */
+    gap: 40px;
+    /* Abstand zwischen den Elementen (zusätzlich zu padding) */
+
+    z-index: 2;
+    pointer-events: none;
+    /* reine Anzeige; Events kommen später */
+}
+
+/* Damit die Kinder nicht ungewollt wachsen/schrumpfen */
+.battle_arena>* {
+    flex: 0 0 auto;
+}
+
+/* LEFT CARD – Rahmen + Glow, 400x100% */
+.left_card {
+    position: relative;
+    width: 400px;
+    height: 100%;
+    /* nutzt die 360px der battle_arena */
+    border-radius: 24px;
+
+    /* nur Kante + leichter Außen-Glow */
+    background: transparent;
+    border: 2px solid rgba(44, 195, 255, .55);
+    box-shadow: 0 0 16px rgba(44, 195, 255, .25);
+    overflow: hidden;
+
+    /* Innenabstand für Inhalte (Flagge/Infos kommen später) */
+    padding: 22px;
+    display: flex;
+    /* ⬅️ macht die Kinder nebeneinander */
+    flex-direction: row;
+    /* ⬅️ horizontale Anordnung */
+    align-items: center;
+}
+
+/* sanfter Rand-Glow / „Fade“ nach innen */
+.left_card::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    /* leicht größer als die Karte */
+    border-radius: 26px;
+    /* zwei weiche Spots in den Ecken, die nach innen ausblenden */
+    background:
+        radial-gradient(140% 140% at 10% 10%, rgba(44, 195, 255, .28), transparent 60%),
+        radial-gradient(140% 140% at 90% 90%, rgba(44, 195, 255, .20), transparent 60%);
+    filter: blur(10px);
+    z-index: -1;
+    /* hinter dem Rahmen */
+}
+
+/* (optional) sehr dezente Innen-Vignette für „durchscheinen“-Look */
+.left_card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: radial-gradient(circle at 50% 50%,
+            rgba(255, 255, 255, .04) 0%,
+            rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+}
+
+/* RIGHT CARD – Rahmen + Glow, 400x100% */
+.right_card {
+    position: relative;
+    width: 400px;
+    height: 100%;
+    /* nutzt die 360px der battle_arena */
+    border-radius: 24px;
+
+    /* nur Kante + leichter Außen-Glow */
+    background: transparent;
+    border: 2px solid rgba(44, 195, 255, .55);
+    box-shadow: 0 0 16px rgba(44, 195, 255, .25);
+    overflow: hidden;
+
+    /* Innenabstand für Inhalte (Infos/Flagge kommen später) */
+    padding: 22px;
+}
+
+/* sanfter Rand-Glow / „Fade“ nach innen – gespiegelt */
+.right_card::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 26px;
+    background:
+        radial-gradient(140% 140% at 90% 10%, rgba(44, 195, 255, .28), transparent 60%),
+        radial-gradient(140% 140% at 10% 90%, rgba(44, 195, 255, .20), transparent 60%);
+    filter: blur(10px);
+    z-index: -1;
+}
+
+/* dezente Innen-Vignette */
+.right_card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: radial-gradient(circle at 50% 50%,
+            rgba(255, 255, 255, .04) 0%,
+            rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+}
+
+.left_card .Flagge {
+    width: 25%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    /* vertikal zentrieren */
+    justify-content: center;
+    /* horizontal zentrieren */
+}
+
+.left_card .Flagge {
+    flex: 0 0 25%;
+    /* ⬅️ fester Anteil 25% */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.left_card .Infos {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+
+    margin-right: 30px;
+    /* ⬅ Abstand zum Timer */
+}
+
+.left_card .Infos_right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+
+    margin-left: 30px;
+    /* ⬅ Abstand zum Timer */
+}
+
+.left_card .Flagge img {
+    max-width: 100%;
+    max-height: 66%;
+    border-radius: 10px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .35);
+}
+
+.left_card .Infos .Landname {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    color: #e7f1ff;
+    margin-bottom: 10px;
+}
+
+.left_card .Infos .Punktestand {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 900;
+    /* passt sich dynamisch an: min 60px, bevorzugt 110px, max 110px */
+    font-size: clamp(60px, 10vw, 110px);
+    line-height: 1;
+    color: #7cd6ff;
+    text-shadow: 0 0 18px rgba(124, 214, 255, .35);
+    max-width: 100%;
+    white-space: nowrap;
+    /* verhindert Zeilenumbruch */
+}
+
+.left_card .Infos_right .Landname {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    color: #e7f1ff;
+    margin-bottom: 10px;
+}
+
+.left_card .Infos_right .Punktestand {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 900;
+    /* passt sich dynamisch an: min 60px, bevorzugt 110px, max 110px */
+    font-size: clamp(60px, 10vw, 110px);
+    line-height: 1;
+    color: #e7883f;
+    text-shadow: 0 0 18px rgba(124, 214, 255, .35);
+    max-width: 100%;
+    white-space: nowrap;
+    /* verhindert Zeilenumbruch */
+}
+
+/* ==== Partikel-Layer (hinter den Cards) ==== */
+/* Bereich, in dem die Pixel sichtbar sind */
+:root {
+    /* ⬇⬇ HIER Höhe einstellen */
+    --particles-top: 260px;
+    /* Start knapp unter dem Titelstrich */
+    --particles-bottom: 1840px;
+    /* Ende knapp unter den Karten */
+}
+
+.particles {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: var(--particles-top);
+    height: calc(var(--particles-bottom) - var(--particles-top));
+    z-index: 1;
+    /* hinter Cards (2), vor Background (0) */
+    pointer-events: none;
+    display: flex;
+}
+
+.particles canvas {
+    width: 50%;
+    /* halbe Breite je Seite */
+    height: 100%;
+    mix-blend-mode: screen;
+    /* unten ausblenden */
+    -webkit-mask: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+    mask: linear-gradient(to bottom, #000 0%, #000 85%, transparent 100%);
+}
+
+/* ===== Bracket-Layout (ohne Linien) ===== */
+:root {
+    /* Position unter deinem Scores/Timer-Bereich */
+    --bracket-top: 760px;
+    /* vertikale Position der gesamten Sektion */
+    --bracket-width: 1000px;
+    /* Gesamtbreite (zentriert) */
+
+    /* Boxen & Abstände */
+    --team-w: 240px;
+    --team-h: 64px;
+    --col-gap: 120px;
+    /* Abstand zwischen den drei Spalten */
+    --row-gap-qf: 18px;
+    /* Abstand innerhalb Viertelfinale */
+    --row-gap-sf: 26px;
+    /* Abstand innerhalb Halbfinale */
+    --row-gap-final: 36px;
+    /* Abstand innerhalb Finale */
+}
+
+/* Container */
+.bracket {
+    position: absolute;
+    top: var(--bracket-top);
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--bracket-width);
+    z-index: 2;
+    /* über Background, unter Particles/Cards passt */
+    pointer-events: none;
+    /* rein visuell */
+}
+
+/* Header mit drei Titeln nebeneinander */
+.bracket-header {
+    display: flex;
+    justify-content: space-between;
+    /* oder: space-around */
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.bracket-header>div {
+    width: var(--team-w);
+    text-align: center;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: .16em;
+    color: #9adfff;
+    text-shadow: 0 0 10px rgba(0, 183, 255, .6);
+}
+
+/* Körper: drei Spalten nebeneinander */
+.bracket-body {
+    display: grid;
+    grid-template-columns: var(--team-w) var(--col-gap) var(--team-w) var(--col-gap) var(--team-w);
+    align-items: start;
+    justify-content: center;
+}
+
+/* Spalten: stehen jeweils in einer der 3 Grid-Spalten */
+.bracket-body .col.qf {
+    grid-column: 1;
+    display: grid;
+    gap: var(--row-gap-qf);
+}
+
+.bracket-body .col.sf {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 100px;
+    /* vertikaler Abstand zwischen den Halbfinal-Boxen */
+    padding-top: 46px;
+    /* Startabstand, sodass die erste SF-Box mittig zwischen VF 1+2 liegt */
+    padding-left: 100%;
+}
+
+/* Finale vertikal mittig zwischen den Halbfinals */
+.bracket-body .col.final {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 265px;
+    /* Abstand zwischen den Final-Boxen */
+    padding-top: 130px;
+    padding-left: 150%;
+    /* Startabstand, sodass die 1. Finalbox mittig zwischen SF 1+2 ist */
+}
+
+/* Team-Boxen (Glow-Rahmen, ohne Linien) */
+.team-box {
+    width: var(--team-w);
+    height: var(--team-h);
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 2px solid rgba(44, 195, 255, .55);
+    box-shadow: 0 0 14px rgba(44, 195, 255, .22);
+    background: rgba(10, 20, 40, .18);
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.team-box::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 14px;
+    background:
+        radial-gradient(120% 120% at 10% 10%, rgba(44, 195, 255, .18), transparent 60%),
+        radial-gradient(120% 120% at 90% 90%, rgba(44, 195, 255, .12), transparent 60%);
+    filter: blur(8px);
+    z-index: -1;
+}
+
+.team-box img {
+    width: 56px;
+    height: 38px;
+    object-fit: cover;
+    border-radius: 8px;
+    outline: 1px solid rgba(255, 255, 255, .15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+
+.team-box span {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: .06em;
+    color: #e7f1ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Endless scrolling background */
+/* Endless scrolling background */
+.bg-conveyor {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    /* hinter allem */
+}
+
+.bg-seg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* ⬅️ beide bei 0, JS schiebt! */
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    will-change: transform;
+}
+
+/* Falls noch vorhanden – bitte löschen:
+#bgB { left:100%; }
+.mirrored { transform: scaleX(-1); }
+*/
+
+
+/* startet rechts außerhalb */
+
+/* ===== Regeln/Scoring-Bar unter dem Bracket ===== */
+:root {
+    /* Position & Größe der Leiste anpassen */
+    --rules-top: 1485px;
+    /* ⬅️ vertikale Position (unter dem Bracket) */
+    --rules-width: 1000px;
+    /* wie das Bracket */
+    --rules-height: 90px;
+    /* ca. 90–100px gewünschte Höhe */
+}
+
+.rulesbar {
+    position: absolute;
+    top: var(--rules-top);
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--rules-width);
+    height: var(--rules-height);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+
+    z-index: 2;
+    /* über dem bewegten BG, unter UI reicht */
+    pointer-events: none;
+    /* rein visuell */
+}
+
+/* einzelne Regel-Karten im Team-Box Stil */
+.rulesbar .rule {
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+
+    border: 2px solid rgba(44, 195, 255, .55);
+    box-shadow: 0 0 14px rgba(44, 195, 255, .22);
+    background: rgba(10, 20, 40, .18);
+    border-radius: 12px;
+    position: relative;
+    backdrop-filter: blur(2px);
+}
+
+.rulesbar .rule::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 14px;
+    background:
+        radial-gradient(120% 120% at 10% 10%, rgba(44, 195, 255, .18), transparent 60%),
+        radial-gradient(120% 120% at 90% 90%, rgba(44, 195, 255, .12), transparent 60%);
+    filter: blur(8px);
+    z-index: -1;
+}
+
+.rulesbar .icon {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    line-height: 1;
+    border-radius: 10px;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .15), rgba(0, 183, 255, .18));
+    outline: 1px solid rgba(255, 255, 255, .12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+
+.rulesbar .label {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    letter-spacing: .03em;
+    color: #e7f1ff;
+    font-size: 18px;
+    white-space: nowrap;
+}
+
+/* Regeln/Scoring-Bar */
+.rulesbar {
+    position: absolute;
+    top: var(--rules-top);
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--rules-width);
+    height: var(--rules-height);
+    /* ⬇️ WICHTIG für Marquee */
+    overflow: hidden;
+    /* damit außerhalb liegende Karten abgeschnitten werden */
+    z-index: 2;
+    pointer-events: none;
+    display: block;
+    /* Track übernimmt Layout */
+}
+
+/* Der laufende Track */
+.rules-track {
+    display: inline-flex;
+    align-items: center;
+    gap: 18px;
+    will-change: transform;
+    /* ⬇️ Geschwindigkeit hier einstellen (Sekunden für eine „Runde“) */
+    animation: rules-scroll 24s linear infinite;
+}
+
+/* Keyframes: nach links schieben */
+@keyframes rules-scroll {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
+    }
+
+    /* wir duplizieren den Inhalt => halbe Strecke */
+}
+
+/* kleine farbige Wert-Badges */
+.pill {
+    display: inline-block;
+    min-width: 40px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin: 0 4px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    color: #0b1430;
+    text-shadow: none;
+    box-shadow: 0 0 12px rgba(255, 255, 255, .06), inset 0 0 8px rgba(0, 0, 0, .15);
+}
+
+.pill-blue {
+    background: linear-gradient(180deg, #9adfff, #5cc9ff);
+    color: #0b2133;
+}
+
+.pill-gold {
+    background: linear-gradient(180deg, #ffe38a, #ffbf3e);
+    color: #3a2600;
+    box-shadow: 0 0 12px rgba(255, 191, 62, .35), inset 0 0 8px rgba(0, 0, 0, .15);
+}
+
+:root {
+    --podium-top: 1595px;
+    --podium-width: 680px;
+    --gold: #ffbf3e;
+    --silver: #cfd8e6;
+    --bronze: #d58a4a;
+}
+
+.podium {
+    position: absolute;
+    top: var(--podium-top);
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--podium-width);
+    z-index: 2;
+    display: grid;
+    place-items: center;
+}
+
+.podium-track {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 22px;
+}
+
+
+.slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: podiumIn .7s ease-out both;
+}
+
+.slot.first {
+    animation-delay: .08s;
+}
+
+.slot.second {
+    animation-delay: .16s;
+    transform: translateY(8px);
+}
+
+.slot.third {
+    animation-delay: .24s;
+    transform: translateY(8px);
+}
+
+/* Zahl oben */
+.rank {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 900;
+    font-size: 42px;
+    margin-bottom: 8px;
+}
+
+.slot.first .rank {
+    color: var(--gold);
+}
+
+.slot.second .rank {
+    color: var(--silver);
+}
+
+.slot.third .rank {
+    color: var(--bronze);
+}
+
+/* Podestkörper */
+.pedestal {
+    min-width: 200px;
+    height: 84px;
+    border-radius: 14px;
+    background: #0c1c34;
+    /* dunkel, nicht transparent */
+    border: 3px solid #00b7ff;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 14px;
+}
+
+.slot.first .pedestal {
+    min-width: 240px;
+    height: 108px;
+}
+
+.slot.second .pedestal {
+    height: 92px;
+}
+
+.slot.third .pedestal {
+    height: 92px;
+}
+
+/* Avatar + Name */
+.pedestal img {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    outline: 2px solid rgba(255, 255, 255, .25);
+}
+
+.pedestal .name {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: .04em;
+    color: #e7f1ff;
+    white-space: nowrap;
+}
+
+/* Einfahr-Animation */
+@keyframes podiumIn {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Timer-Spin gestoppt, wenn Ende */
+.timer.ended::before {
+    animation: none;
+    opacity: .35;
+}
+
+.team-box.winner {
+    box-shadow: 0 0 10px 3px limegreen;
+    border: 2px solid limegreen;
+    animation: winner-glow 1s ease-in-out infinite alternate;
+}
+
+@keyframes winner-glow {
+    0% {
+        box-shadow: 0 0 10px 3px limegreen;
+    }
+
+    100% {
+        box-shadow: 0 0 20px 6px limegreen;
+    }
+}
+
+#timer-text.phase-text {
+    font-size: 2rem;
+    /* kleiner als normaler Uhr-Text */
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+    /* falls Text umbrechen darf */
+}
+
+.card-winner {
+    border: 6px solid limegreen;
+    box-shadow: 0 0 20px 5px rgba(50, 205, 50, 0.8);
+    transition: all 0.3s ease-in-out;
+}
+
+.card-loser {
+    border: 5px solid red;
+    box-shadow: 0 0 15px red;
+    transition: all 0.3s ease-in-out;
+}
+
+#control-panel {
+    position: fixed;
+    top: 80px;
+    /* etwas Abstand von oben */
+    left: 20px;
+    /* am linken Rand */
+    width: 280px;
+    padding: 12px 14px;
+    background: rgba(10, 20, 40, .85);
+    border: 2px solid rgba(44, 195, 255, .55);
+    border-radius: 12px;
+    box-shadow: 0 0 14px rgba(44, 195, 255, .22);
+    font-family: 'Poppins', sans-serif;
+    color: #e7f1ff;
+    z-index: 5;
+    /* bleibt über dem Hintergrund, aber unter Modals */
+}
+
+#control-panel h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    letter-spacing: .08em;
+}
+
+#country-selectors {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+#control-panel select {
+    padding: 6px;
+    border-radius: 8px;
+    background: #0c1c34;
+    color: #e7f1ff;
+    border: 1px solid rgba(255, 255, 255, .15);
+}
+
+#control-panel .cp-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#control-panel button {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 2px solid #00b7ff;
+    background: #0c1c34;
+    color: #e7f1ff;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+
+/* ===== Modal ===== */
+.modal.hidden {
+    display: none
+}
+
+.modal {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, .55);
+    backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    width: 760px;
+    max-width: 90vw;
+    padding: 20px;
+    border-radius: 16px;
+    background: #0c1c34;
+    border: 3px solid #00b7ff;
+    color: #e7f1ff;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, .45);
+    font-family: 'Poppins', sans-serif;
+}
+
+.modal-content h2 {
+    margin: 0 0 14px 0;
+    font-size: 28px;
+    text-align: center
+}
+
+.winner-line {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px
+}
+
+#winner-flag,
+#modal-winner-flag {
+    width: 56px;
+    height: 38px;
+    object-fit: cover;
+    border-radius: 8px;
+    outline: 1px solid rgba(255, 255, 255, .15)
+}
+
+.top3 h3 {
+    margin: 0 0 8px 0;
+    text-align: center
+}
+
+#modal-top3 {
+    list-style: decimal;
+    padding-left: 24px;
+    margin: 0 0 12px 0
+}
+
+#modal-top3 li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0
+}
+
+#modal-top3 img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    outline: 1px solid rgba(255, 255, 255, .15)
+}
+
+
+
+#time-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+#time-settings label {
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#time-settings input {
+    width: 80px;
+    padding: 4px;
+    background: #0c1c34;
+    border: 1px solid rgba(255, 255, 255, .15);
+    color: #e7f1ff;
+    border-radius: 6px;
+}
+
+#top-countries {
+    margin-top: 10px;
+    padding: 10px;
+    border: 2px solid rgba(44, 195, 255, .55);
+    border-radius: 10px;
+    background: rgba(10, 20, 40, .65);
+}
+
+#top-countries h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    letter-spacing: .08em;
+    color: #9adfff;
+    text-align: left;
+}
+
+.top10-list {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.top10-list li {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #e7f1ff;
+}
+
+.top10-list img {
+    width: 28px;
+    height: 18px;
+    border-radius: 4px;
+    object-fit: cover;
+    outline: 1px solid rgba(255, 255, 255, .15);
+}
+
+/* Gewinner-Modal größer und cleaner */
+.modal-content.modal-winner {
+    width: 920px;
+    max-width: 92vw;
+    padding: 28px 30px 30px;
+    border-radius: 22px;
+    background: #0c1c34;
+    border: 3px solid #00b7ff;
+}
+
+.modal-title {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 900;
+    font-size: 42px;
+    text-align: center;
+    margin: 4px 0 14px;
+    color: #e7f1ff;
+    letter-spacing: .01em;
+}
+
+.winner-line.big {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+#modal-winner-flag {
+    width: 72px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 10px;
+    outline: 1px solid rgba(255, 255, 255, .18);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .35);
+}
+
+#modal-winner-name {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 900;
+    font-size: 34px;
+    color: #9adfff;
+    letter-spacing: .06em;
+}
+
+/* Top-3 Liste groß, Avatar + Name + Punkte */
+.top3-title {
+    text-align: center;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    color: #e7f1ff;
+    margin-bottom: 12px;
+}
+
+.top3-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.top3-list li {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 2px solid rgba(44, 195, 255, .45);
+    border-radius: 14px;
+    background: rgba(10, 20, 40, .25);
+}
+
+.top3-list img {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    outline: 1px solid rgba(255, 255, 255, .18);
+}
+
+.top3-list .name {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    color: #e7f1ff;
+    letter-spacing: .02em;
+}
+
+.top3-list .points {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    color: #ffe38a;
+}
+
+#control-panel .music-toggle {
+    /* Layout im Panel */
+    position: static;
+    /* wichtig: NICHT fixed */
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+
+    /* dein Stil */
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 2px solid #00b7ff;
+    background: #0c1c34;
+    color: #e7f1ff;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 0 14px rgba(44, 195, 255, .22);
+}
+
+/* aktiver Zustand */
+#control-panel .music-toggle[aria-pressed="true"] {
+    box-shadow: 0 0 18px rgba(0, 183, 255, .55);
+}
+
+
+.music-toggle[aria-pressed="true"] {
+    box-shadow: 0 0 18px rgba(0, 183, 255, .55);
+}
+
+#control-panel .music-toggle {
+    margin-top: 8px;
+    width: 100%;
+}
