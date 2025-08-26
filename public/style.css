@@ -349,6 +349,13 @@ body {
     /* verhindert Zeilenumbruch */
 }
 
+
+
+.Punktestand.small {
+    font-size: 1.8rem;
+    /* kleinere Variante ab 5-stellig */
+}
+
 .left_card .Infos_right .Landname {
     font-family: 'Poppins', sans-serif;
     font-weight: 800;
@@ -719,11 +726,11 @@ body {
 }
 
 :root {
-    --podium-top: 1595px;
-    --podium-width: 680px;
+    --podium-top: 1545px;
     --gold: #ffbf3e;
     --silver: #cfd8e6;
     --bronze: #d58a4a;
+    --pedestal-w: 220px;
 }
 
 .podium {
@@ -731,11 +738,14 @@ body {
     top: var(--podium-top);
     left: 50%;
     transform: translateX(-50%);
-    width: var(--podium-width);
+    width: fit-content;
+    /* <— statt fester Breite */
+    max-width: none;
     z-index: 2;
     display: grid;
     place-items: center;
 }
+
 
 .podium-track {
     display: flex;
@@ -788,11 +798,10 @@ body {
 
 /* Podestkörper */
 .pedestal {
-    min-width: 200px;
+    width: var(--pedestal-w);
     height: 84px;
     border-radius: 14px;
     background: #0c1c34;
-    /* dunkel, nicht transparent */
     border: 3px solid #00b7ff;
     box-shadow: 0 4px 18px rgba(0, 0, 0, .45);
     display: flex;
@@ -802,8 +811,8 @@ body {
     padding: 0 14px;
 }
 
+/* Behalte nur die Höhenunterschiede – NICHT die Breite */
 .slot.first .pedestal {
-    min-width: 240px;
     height: 108px;
 }
 
@@ -815,15 +824,7 @@ body {
     height: 92px;
 }
 
-/* Avatar + Name */
-.pedestal img {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    object-fit: cover;
-    outline: 2px solid rgba(255, 255, 255, .25);
-}
-
+/* Name: Ellipsis + darf in Flex schrumpfen */
 .pedestal .name {
     font-family: 'Poppins', sans-serif;
     font-weight: 800;
@@ -831,6 +832,32 @@ body {
     letter-spacing: .04em;
     color: #e7f1ff;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    /* <— wichtig in Flex-Layouts! */
+    flex: 1 1 auto;
+    /* nimmt restliche Breite zwischen Avatar u. Rand */
+}
+
+/* Avatar bleibt fix */
+.pedestal img {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    outline: 2px solid rgba(255, 255, 255, .25);
+    flex: 0 0 auto;
+    /* wächst nicht mit */
+}
+
+/* Option: leicht mehr Platz zwischen den Slots, wenn du willst */
+.podium-track {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 22px;
+    /* anpassbar */
 }
 
 /* Einfahr-Animation */
@@ -1217,4 +1244,107 @@ body {
 #control-panel .music-toggle {
     margin-top: 8px;
     width: 100%;
+}
+
+/* ===== Searchable Select (Country Combo) ===== */
+.country-combo {
+    position: relative;
+    font-family: 'Poppins', sans-serif;
+}
+
+.country-combo .cc-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 2px solid #00b7ff;
+    background: #0c1c34;
+    color: #e7f1ff;
+    cursor: pointer;
+    box-shadow: 0 0 14px rgba(44, 195, 255, .22);
+}
+
+.country-combo .cc-pill img {
+    width: 24px;
+    height: 16px;
+    border-radius: 3px;
+    object-fit: cover;
+}
+
+.country-combo .panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: #0c1c34;
+    border: 2px solid rgba(44, 195, 255, .55);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    padding: 8px;
+    z-index: 20;
+    display: none;
+}
+
+.country-combo.open .panel {
+    display: block;
+}
+
+.country-combo .search {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #0b1730;
+    border: 1px solid rgba(255, 255, 255, .15);
+    color: #e7f1ff;
+    margin-bottom: 8px;
+}
+
+.country-combo .list {
+    max-height: 240px;
+    overflow: auto;
+    display: grid;
+    gap: 6px;
+}
+
+.country-combo .item {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    background: rgba(10, 20, 40, .18);
+    border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.country-combo .item:hover,
+.country-combo .item.active {
+    background: rgba(0, 183, 255, .12);
+    border-color: rgba(0, 183, 255, .45);
+}
+
+.country-combo .item img {
+    width: 28px;
+    height: 18px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+/* gewinnt gegen die spezifischen clamp-Regeln */
+.left_card .Infos .Punktestand.small,
+.left_card .Infos_right .Punktestand.small {
+    font-size: clamp(40px, 6vw, 70px);
+}
+
+.left_card .Infos .Punktestand.tiny,
+.left_card .Infos_right .Punktestand.tiny {
+    font-size: clamp(22px, 3.3vw, 38px);
+}
+
+.left_card .Infos,
+.left_card .Infos_right {
+    flex: 1 1 auto;
+    min-width: 0;
 }

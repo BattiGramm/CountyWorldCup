@@ -83,7 +83,10 @@ let currentMatchIndex = 0;
 const supporters = new Map();
 // key = userId (lowercase), value = { team: 'GERMANY' | 'BELGIUM' | ..., points: number }
 // 🔝 Gesamt-Leaderboard (bleibt rundenübergreifend)
-const globalScores = new Map(); // key = userId (lowercase) -> { name, avatar, points }
+// 🔢 Punktetöpfe
+const perRoundScores = new Map();  // nur aktuelle Runde (Podium unten)
+const overallScores = new Map();  // gesamtes Turnier (Winner-Modal)
+// key = userId (lowercase) -> { name, avatar, points }
 
 // 👤 Platzhalter-Avatar als Data-URI (Person-Icon)
 const AVATAR_PLACEHOLDER =
@@ -98,12 +101,26 @@ const AVATAR_PLACEHOLDER =
 let ROUND_DURATION = 60; // Default 60 Sekunden
 let OVERTIME_DURATION = 30; // Default 30 Sekunden
 
+const startCue = new Audio('assets/startsound2.mp3');
+startCue.preload = 'auto';
+startCue.volume = 0.7;
+
+const finalSound = new Audio('assets/FinalSound.mp3');
+finalSound.preload = 'auto';
+finalSound.volume = 1;
+
+// Sound bei Rundenende (wenn "ENDE" angezeigt wird)
+const endCue = new Audio('assets/roundwinner.mp3'); // Datei ins public/assets legen
+endCue.preload = 'auto';
+endCue.volume = 1.0; // nach Geschmack
+
+
 let pointsActive = false;
 let currentLeftTeam = '';
 let currentRightTeam = '';
 function updatePodium() {
-    // Top 3 berechnen
-    const top3 = Array.from(globalScores.values())
+    // ⬇️ Top 3 nur aus der aktuellen Runde
+    const top3 = Array.from(perRoundScores.values())
         .sort((a, b) => b.points - a.points)
         .slice(0, 3);
 
@@ -131,6 +148,37 @@ function updatePodium() {
         }
     });
 }
+
+function awardPoints(userId, delta, userName = '', avatarUrl = '') {
+    const key = String(userId || '').toLowerCase();
+    const base = {
+        name: userName || userId,
+        avatar: avatarUrl || '',
+        points: 0
+    };
+
+    // Aktuelle Runde
+    const r = perRoundScores.get(key) || { ...base };
+    r.name = r.name || base.name;
+    r.avatar = r.avatar || base.avatar;
+    r.points += delta;
+    perRoundScores.set(key, r);
+
+    // Gesamtturnier
+    const o = overallScores.get(key) || { ...base };
+    o.name = o.name || base.name;
+    o.avatar = o.avatar || base.avatar;
+    o.points += delta;
+    overallScores.set(key, o);
+
+    updatePodium();
+}
+
+function resetPerRoundLeaderboard() {
+    perRoundScores.clear();
+    updatePodium();
+}
+
 
 function getCol(colClass) {
     return document.querySelector(`.bracket-body .col.${colClass}`);
@@ -169,6 +217,9 @@ function setArena(leftTeam, rightTeam, leftScore, rightScore) {
 
     document.getElementById('score-left').textContent = String(leftScore);
     document.getElementById('score-right').textContent = String(rightScore);
+    adjustScoreFont(document.getElementById('score-left'));
+    adjustScoreFont(document.getElementById('score-right'));
+
 }
 
 function getWinnerFromArena() {
@@ -197,10 +248,12 @@ function addPointToTeam(teamName) {
     if (teamName.toLowerCase() === currentLeftTeam.toLowerCase()) {
         const scoreEl = document.getElementById('score-left');
         scoreEl.textContent = parseInt(scoreEl.textContent, 10) + 1;
+        adjustScoreFont(scoreEl);
         bumpCountryPoints(currentLeftTeam, 1);   // ⬅️ NEW
     } else if (teamName.toLowerCase() === currentRightTeam.toLowerCase()) {
         const scoreEl = document.getElementById('score-right');
         scoreEl.textContent = parseInt(scoreEl.textContent, 10) + 1;
+        adjustScoreFont(scoreEl);
         bumpCountryPoints(currentRightTeam, 1);  // ⬅️ NEW
     }
 }
@@ -225,18 +278,11 @@ function pledgeUserToTeam(userId, rawText, userName = '', avatarUrl = '') {
         });
 
         // 1 Punkt für den Chat selbst
-        addPointToTeam(chosen);
+        addPointToTeam(chosen); // Team-Score + Alltime-Country bleibt wie gehabt
 
-        // ➕ Gesamtwertung
-        const existing = globalScores.get(key) || {
-            name: userName || userId,
-            avatar: avatarUrl || '',
-            points: 0
-        };
-        existing.name = existing.name || userName || userId;   // ggf. Name nachtragen
-        existing.avatar = existing.avatar || avatarUrl || '';  // ggf. Avatar nachtragen
-        existing.points += 1;
-        globalScores.set(key, existing);
+        // ➕ Punkte an beide Töpfe (Runde + Overall)
+        awardPoints(userId, 1, userName, avatarUrl);
+
 
         updatePodium();
     }
@@ -252,10 +298,12 @@ function applyLikeFromUser(userId, userName = '', avatarUrl = '') {
     if (normTeam(sup.team) === normTeam(currentLeftTeam)) {
         const el = document.getElementById('score-left');
         el.textContent = String(parseInt(el.textContent, 10) + score);
+        adjustScoreFont(el);
         bumpCountryPoints(currentLeftTeam, score);  // ⬅️ NEW
     } else if (normTeam(sup.team) === normTeam(currentRightTeam)) {
         const el = document.getElementById('score-right');
         el.textContent = String(parseInt(el.textContent, 10) + score);
+        adjustScoreFont(el);
         bumpCountryPoints(currentRightTeam, score); // ⬅️ NEW
     }
 
@@ -263,15 +311,8 @@ function applyLikeFromUser(userId, userName = '', avatarUrl = '') {
     sup.points = (sup.points || 0) + score;
     supporters.set(key, sup);
 
-    const existing = globalScores.get(key) || {
-        name: userName || userId,
-        avatar: avatarUrl || '',
-        points: 0
-    };
-    existing.name = existing.name || userName || userId;
-    existing.avatar = existing.avatar || avatarUrl || '';
-    existing.points += score;
-    globalScores.set(key, existing);
+    awardPoints(userId, score, userName, avatarUrl);
+
 
     updatePodium();
 }
@@ -287,25 +328,20 @@ function applyFollowFromUser(userId, userName = '', avatarUrl = '') {
     if (normTeam(sup.team) === normTeam(currentLeftTeam)) {
         const el = document.getElementById('score-left');
         el.textContent = String(parseInt(el.textContent, 10) + score);
+        adjustScoreFont(el);
         bumpCountryPoints(currentLeftTeam, score);
     } else if (normTeam(sup.team) === normTeam(currentRightTeam)) {
         const el = document.getElementById('score-right');
         el.textContent = String(parseInt(el.textContent, 10) + score);
+        adjustScoreFont(el);
         bumpCountryPoints(currentRightTeam, score);
     }
 
     sup.points = (sup.points || 0) + score;
     supporters.set(key, sup);
 
-    const existing = globalScores.get(key) || {
-        name: userName || userId,
-        avatar: avatarUrl || '',
-        points: 0
-    };
-    existing.name = existing.name || userName || userId;
-    existing.avatar = existing.avatar || avatarUrl || '';
-    existing.points += score;
-    globalScores.set(key, existing);
+    awardPoints(userId, score, userName, avatarUrl);
+
 
     updatePodium();
 }
@@ -322,10 +358,12 @@ function applyGiftFromUser(userId, coins, userName = '', avatarUrl = '') {
     if (normTeam(sup.team) === normTeam(currentLeftTeam)) {
         const el = document.getElementById('score-left');
         el.textContent = String(parseInt(el.textContent, 10) + score);
+        adjustScoreFont(el);
         bumpCountryPoints(currentLeftTeam, score);
     } else if (normTeam(sup.team) === normTeam(currentRightTeam)) {
         const el = document.getElementById('score-right');
         el.textContent = String(parseInt(el.textContent, 10) + score);
+        adjustScoreFont(el);
         bumpCountryPoints(currentRightTeam, score);
     } else {
         return;
@@ -335,16 +373,8 @@ function applyGiftFromUser(userId, coins, userName = '', avatarUrl = '') {
     sup.points = (sup.points || 0) + score;
     supporters.set(key, sup);
 
-    // ➕ Gesamtwertung
-    const existing = globalScores.get(key) || {
-        name: userName || userId,
-        avatar: avatarUrl || '',
-        points: 0
-    };
-    existing.name = existing.name || userName || userId;
-    existing.avatar = existing.avatar || avatarUrl || '';
-    existing.points += score;
-    globalScores.set(key, existing);
+    awardPoints(userId, score, userName, avatarUrl);
+
 
     updatePodium();
 }
@@ -368,6 +398,8 @@ function startMatch(round, matchIndex) {
     pointsActive = false;
     // Neue Runde → Supporter der vorherigen Runde löschen
     supporters.clear();
+    // 🔁 neue Runde = neue Podium-Liste
+    resetPerRoundLeaderboard();
 
     setArena(teamA, teamB, 0, 0);
 
@@ -380,7 +412,13 @@ function startMatch(round, matchIndex) {
     }
 
     setPhase("NÄCHSTE RUNDE", 10, () => {
+        // Sound starten – läuft von allein durch
+        try {
+            startCue.currentTime = 0; // von vorn
+            startCue.play().catch(() => { });
+        } catch (e) { }
         setPhase("AUF DIE PLÄTZE!", 1, () => {
+
             setPhase("FERTIG!", 1, () => {
                 setPhase("LOS!", 1, () => {
                     pointsActive = true;
@@ -393,7 +431,8 @@ function startMatch(round, matchIndex) {
     });
 }
 
-window.addEventListener('match:end', () => {
+window.addEventListener('match:end', (ev) => {
+
     const leftScore = parseInt(document.getElementById('score-left')?.textContent ?? '0', 10) || 0;
     const rightScore = parseInt(document.getElementById('score-right')?.textContent ?? '0', 10) || 0;
 
@@ -418,18 +457,28 @@ window.addEventListener('match:end', () => {
 
         return; // normalen Ablauf abbrechen
     }
-
+    if (!ev || !ev.detail || ev.detail.reason === 'timeup') {
+        try {
+            endCue.currentTime = 0;
+            endCue.play().catch(() => { });
+        } catch (e) { }
+    }
     // 2️⃣ Falls immer noch unentschieden nach Overtime → Random Winner
     if (leftScore === rightScore && window.overtimePlayed) {
         const randomWinner = Math.random() < 0.5 ? currentLeftTeam : currentRightTeam;
         if (randomWinner.toLowerCase() === currentLeftTeam.toLowerCase()) {
-            document.getElementById('score-left').textContent = leftScore + 1;
+            const el = document.getElementById('score-left');
+            el.textContent = leftScore + 1;
+            adjustScoreFont(el); // <-- FIX
             bumpCountryPoints(currentLeftTeam, 1);
         } else {
-            document.getElementById('score-right').textContent = rightScore + 1;
+            const el = document.getElementById('score-right');
+            el.textContent = rightScore + 1;
+            adjustScoreFont(el); // <-- FIX
             bumpCountryPoints(currentRightTeam, 1);
         }
     }
+
 
     // 3️⃣ Ab hier normaler Match-Ende Ablauf
     pointsActive = false;
@@ -570,16 +619,112 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ====== Länderliste (Name + Flag-Pfad) ======
 const allCountries = [
-    { name: "GERMANY", flag: "flags/de.png" },
-    { name: "BELGIUM", flag: "flags/be.png" },
-    { name: "FRANCE", flag: "flags/fr.png" },
-    { name: "SPAIN", flag: "flags/es.png" },
-    { name: "ITALY", flag: "flags/it.png" },
-    { name: "NETHERLANDS", flag: "flags/nl.png" },
-    { name: "ENGLAND", flag: "flags/gb.png" },
+    { name: "ANDORRA", flag: "flags/ad.png" },
+    { name: "VEREINIGTE ARABISCHE EMIRATE", flag: "flags/ae.png" },
+    { name: "AFGHANISTAN", flag: "flags/af.png" },
+    { name: "ANTIGUA UND BARBUDA", flag: "flags/ag.png" },
+    { name: "ANGUILLA", flag: "flags/ai.png" },
+    { name: "ALBANIEN", flag: "flags/al.png" },
+    { name: "ARMENIEN", flag: "flags/am.png" },
+    { name: "ANGOLA", flag: "flags/ao.png" },
+    { name: "ANTARKTIS", flag: "flags/aq.png" },
+    { name: "ARGENTINIEN", flag: "flags/ar.png" },
+    { name: "AMERIKANISCH-SAMOA", flag: "flags/as.png" },
+    { name: "ÖSTERREICH", flag: "flags/at.png" },
+    { name: "AUSTRALIEN", flag: "flags/au.png" },
+    { name: "ARUBA", flag: "flags/aw.png" },
+    { name: "ÅLAND-INSELN", flag: "flags/ax.png" },
+    { name: "ASERBAIDSCHAN", flag: "flags/az.png" },
+    { name: "BOSNIEN UND HERZEGOWINA", flag: "flags/ba.png" },
+    { name: "LIBANON", flag: "flags/lb.png" },
+    { name: "BARBADOS", flag: "flags/bb.png" },
+    { name: "BANGLADESCH", flag: "flags/bd.png" },
+    { name: "BELGIEN", flag: "flags/be.png" },
+    { name: "BURKINA FASO", flag: "flags/bf.png" },
+    { name: "TUNESIEN", flag: "flags/tn.png" },
+    { name: "KURDISTAN", flag: "flags/kr.png" },
+    { name: "BULGARIEN", flag: "flags/bg.png" },
+    { name: "DUBAI", flag: "flags/ae.png" },
+    { name: "BAHRAIN", flag: "flags/bh.png" },
+    { name: "BURUNDI", flag: "flags/bi.png" },
+    { name: "BENIN", flag: "flags/bj.png" },
+    { name: "SAINT BARTHÉLEMY", flag: "flags/bl.png" },
+    { name: "BERMUDA", flag: "flags/bm.png" },
+    { name: "BRUNEI DARUSSALAM", flag: "flags/bn.png" },
+    { name: "BOLIVIEN", flag: "flags/bo.png" },
+    { name: "BONAIRE", flag: "flags/bq.png" },
+    { name: "BRASILIEN", flag: "flags/br.png" },
+    { name: "BHUTAN", flag: "flags/bt.png" },
+    { name: "NORWEGEN", flag: "flags/no.png" },
+    { name: "BELARUS", flag: "flags/by.png" },
+    { name: "BELIZE", flag: "flags/bz.png" },
+    { name: "KANADA", flag: "flags/ca.png" },
+    { name: "KOKOSINSELN", flag: "flags/cc.png" },
+    { name: "KONGO", flag: "flags/cg.png" },
+    { name: "SCHWEIZ", flag: "flags/ch.png" },
+    { name: "CHILE", flag: "flags/cl.png" },
+    { name: "CHINA", flag: "flags/cn.png" },
+    { name: "KOLUMBIEN", flag: "flags/co.png" },
+    { name: "KUBA", flag: "flags/cu.png" },
+    { name: "ZYPERN", flag: "flags/cy.png" },
+    { name: "TSCHECHIEN", flag: "flags/cz.png" },
+    { name: "DEUTSCHLAND", flag: "flags/de.png" },
+    { name: "DÄNEMARK", flag: "flags/dk.png" },
+    { name: "DOMINIKA", flag: "flags/dm.png" },
+    { name: "DOMINIKANISCHE REPUBLIK", flag: "flags/do.png" },
+    { name: "ALGERIEN", flag: "flags/dz.png" },
+    { name: "ECUADOR", flag: "flags/ec.png" },
+    { name: "ESTLAND", flag: "flags/ee.png" },
+    { name: "ÄGYPTEN", flag: "flags/eg.png" },
+    { name: "WESTSAHARA", flag: "flags/eh.png" },
+    { name: "SPANIEN", flag: "flags/es.png" },
+    { name: "FINNLAND", flag: "flags/fi.png" },
+    { name: "FRANKREICH", flag: "flags/fr.png" },
+    { name: "GROSSBRITANNIEN", flag: "flags/gb.png" },
+    { name: "GRIECHENLAND", flag: "flags/gr.png" },
+    { name: "KROATIEN", flag: "flags/hr.png" },
+    { name: "UNGARN", flag: "flags/hu.png" },
+    { name: "INDIEN", flag: "flags/in.png" },
+    { name: "IRLAND", flag: "flags/ie.png" },
+    { name: "ISRAEL", flag: "flags/il.png" },
+    { name: "ITALIEN", flag: "flags/it.png" },
+    { name: "JAPAN", flag: "flags/jp.png" },
+    { name: "KASACHSTAN", flag: "flags/kz.png" },
+    { name: "LETTLAND", flag: "flags/lv.png" },
+    { name: "LITAUEN", flag: "flags/lt.png" },
+    { name: "LUXEMBURG", flag: "flags/lu.png" },
+    { name: "MALTA", flag: "flags/mt.png" },
+    { name: "NORDMAZEDONIEN", flag: "flags/mk.png" },
+    { name: "MEXIKO", flag: "flags/mx.png" },
+    { name: "MONACO", flag: "flags/mc.png" },
+    { name: "MOLDAVIEN", flag: "flags/md.png" },
+    { name: "MONTENEGRO", flag: "flags/me.png" },
+    { name: "MAROKKO", flag: "flags/ma.png" },
+    { name: "NEUSEELAND", flag: "flags/nz.png" },
+    { name: "PAKISTAN", flag: "flags/pk.png" },
+    { name: "NIEDERLANDE", flag: "flags/nl.png" },
+    { name: "NORWEGEN", flag: "flags/no.png" },
+    { name: "POLEN", flag: "flags/pl.png" },
+    { name: "SOMALIA", flag: "flags/so.png" },
     { name: "PORTUGAL", flag: "flags/pt.png" },
-    // -> bei Bedarf hier erweitern
+    { name: "RUMÄNIEN", flag: "flags/ro.png" },
+    { name: "RUSSLAND", flag: "flags/ru.png" },
+    { name: "SERBIEN", flag: "flags/rs.png" },
+    { name: "SCHWEDEN", flag: "flags/se.png" },
+    { name: "SLOWENIEN", flag: "flags/si.png" },
+    { name: "SCHWEIZ", flag: "flags/ch.png" },
+    { name: "TÜRKEI", flag: "flags/tr.png" },
+    { name: "UKRAINE", flag: "flags/ua.png" },
+    { name: "VEREINIGTE STAATEN", flag: "flags/us.png" },
+    { name: "VATIKANSTADT", flag: "flags/va.png" },
+    { name: "KOSOVO", flag: "flags/xk.png" },
+    { name: "IRAN", flag: "flags/ir.png" },
+    { name: "IRAK", flag: "flags/iq.png" },
+    { name: "SYRIEN", flag: "flags/sy.png" },
+    { name: "SÜDAFRIKA", flag: "flags/za.png" },
+    { name: "SIMBABWE", flag: "flags/zw.png" },
 ];
+
 
 // Hilfsfunktion
 function shuffleArray(arr) { return arr.map(v => ({ v, r: Math.random() })).sort((a, b) => a.r - b.r).map(x => x.v); }
@@ -587,6 +732,126 @@ function shuffleArray(arr) { return arr.map(v => ({ v, r: Math.random() })).sort
 // Füllt die 8 VF-Slots
 function setQfTeams(teams) {
     teams.forEach((t, idx) => setTeamInCol('qf', idx, t));
+}
+// ===== Kleine Util für Suche (diakritik-freundlich, case-insensitive)
+const _norm = s => (s || "")
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+/**
+ * Ersetzt ein <select> durch ein Such-Combo-UI, hält aber das <select> im DOM
+ * und setzt dessen value weiter – dein Start-Button-Code bleibt unverändert.
+ */
+function makeSearchableSelect(selectEl, data /* array {name, flag} */) {
+    // verstecken, aber im DOM lassen
+    selectEl.style.display = 'none';
+
+    // Wrapper + Anzeige-Pill
+    const wrap = document.createElement('div');
+    wrap.className = 'country-combo';
+
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'cc-pill';
+    pill.innerHTML = '<span>Land wählen…</span>';
+
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.placeholder = 'Suche Land…';
+    search.className = 'search';
+
+    const list = document.createElement('div');
+    list.className = 'list';
+
+    panel.appendChild(search);
+    panel.appendChild(list);
+    wrap.appendChild(pill);
+    wrap.appendChild(panel);
+    selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
+
+    // Rendering der Treffer
+    let items = [];
+    let activeIndex = -1;
+
+    function render(q = '') {
+        const nq = _norm(q);
+        const results = !nq
+            ? data
+            : data.filter(c => _norm(c.name).includes(nq));
+        list.innerHTML = '';
+        items = results.slice(0, 200).map(c => {
+            const it = document.createElement('div');
+            it.className = 'item';
+            it.innerHTML = `<img src="${c.flag}" alt=""><span>${c.name}</span>`;
+            it.addEventListener('click', () => choose(c));
+            list.appendChild(it);
+            return it;
+        });
+        activeIndex = items.length ? 0 : -1;
+        updateActive();
+    }
+
+    function updateActive() {
+        items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+        if (activeIndex >= 0) items[activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function open() {
+        wrap.classList.add('open');
+        render('');
+        search.value = '';
+        setTimeout(() => search.focus(), 0);
+        document.addEventListener('click', onDocClick, { capture: true });
+    }
+
+    function close() {
+        wrap.classList.remove('open');
+        document.removeEventListener('click', onDocClick, { capture: true });
+    }
+
+    function onDocClick(e) {
+        if (!wrap.contains(e.target)) close();
+    }
+
+    function choose(country) {
+        // UI-Pill aktualisieren
+        pill.innerHTML = `<img src="${country.flag}" alt=""><span>${country.name}</span>`;
+        // <select> synchronisieren (damit dein Start-Button weiter funktioniert)
+        // 1) Option sicherstellen
+        let opt = [...selectEl.options].find(o => o.value === country.name);
+        if (!opt) {
+            opt = document.createElement('option');
+            opt.value = country.name;
+            opt.textContent = country.name;
+            selectEl.appendChild(opt);
+        }
+        selectEl.value = country.name;
+        close();
+    }
+
+    // Events
+    pill.addEventListener('click', () => {
+        if (wrap.classList.contains('open')) close(); else open();
+    });
+    search.addEventListener('input', () => render(search.value));
+    search.addEventListener('keydown', (e) => {
+        if (!items.length) return;
+        if (e.key === 'ArrowDown') { activeIndex = Math.min(activeIndex + 1, items.length - 1); updateActive(); e.preventDefault(); }
+        else if (e.key === 'ArrowUp') { activeIndex = Math.max(activeIndex - 1, 0); updateActive(); e.preventDefault(); }
+        else if (e.key === 'Enter') { items[activeIndex]?.click(); e.preventDefault(); }
+        else if (e.key === 'Escape') { close(); }
+    });
+
+    // Falls das <select> schon einen Wert gesetzt hat, gleich anzeigen
+    if (selectEl.value) {
+        const found = data.find(c => c.name === selectEl.value);
+        if (found) pill.innerHTML = `<img src="${found.flag}" alt=""><span>${found.name}</span>`;
+    }
 }
 
 // Control Panel initialisieren
@@ -597,78 +862,60 @@ function setupControlPanel() {
 
     if (!selects.length || !startBtn) return;
 
-    // Dropdowns füllen
+    // >>> NEU: für jedes Select eine Such-Combo oberhalb aufbauen
     selects.forEach(sel => {
-        allCountries.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.name;
-            opt.textContent = c.name;
-            sel.appendChild(opt);
-        });
+        // Stelle sicher, dass allCountries die Flag-Pfade kennt (dein Array schon vorhanden)
+        makeSearchableSelect(sel, allCountries);
     });
 
+    // Start-Button bleibt unverändert – liest select.value!
     startBtn.addEventListener('click', () => {
-        // 🎯 Neue Zeiten aus Inputs holen
         const roundTimeInput = document.getElementById('round-time');
         const overtimeTimeInput = document.getElementById('overtime-time');
 
         ROUND_DURATION = parseInt(roundTimeInput?.value, 10) || 60;
         OVERTIME_DURATION = parseInt(overtimeTimeInput?.value, 10) || 30;
 
-        console.log("Neue Zeiten gesetzt:", ROUND_DURATION, OVERTIME_DURATION);
-
-        // 8 Länder einsammeln
         let chosen = [];
         selects.forEach(sel => {
             const c = allCountries.find(x => x.name === sel.value);
             if (c) chosen.push(c);
         });
 
-        if (chosen.length !== 8) {
-            alert('Bitte 8 Länder auswählen!');
-            return;
-        }
+        if (chosen.length !== 8) { alert('Bitte 8 Länder auswählen!'); return; }
 
-        // doppelte vermeiden
         const set = new Set(chosen.map(c => c.name));
-        if (set.size !== 8) {
-            alert('Bitte 8 unterschiedliche Länder wählen!');
-            return;
-        }
+        if (set.size !== 8) { alert('Bitte 8 unterschiedliche Länder wählen!'); return; }
 
         if (shuffleCB?.checked) chosen = shuffleArray(chosen);
 
-        // VF setzen
         setQfTeams(chosen);
-
-        // SF/Finale leeren
         ['sf', 'final'].forEach(col => {
-            const el = getCol(col);
-            if (!el) return;
+            const el = getCol(col); if (!el) return;
             [...el.children].forEach(box => box.innerHTML = `<span>—</span>`);
         });
 
-        // Gewinner-Markierungen im Bracket entfernen
         document.querySelectorAll('.team-box.winner').forEach(n => n.classList.remove('winner'));
-
-        // Modal schließen
         hideTournamentModal();
-
-        // ⏱ Start Match 1
+        overallScores.clear();
         startMatch('qf', 0);
     });
-
 }
 
+
 let _winnerModalTimer = null;
-// Kurzsound für Platz-Anzeige
-const rankSound = new Audio('assets/startsound2.mp3');
-rankSound.preload = 'auto';
-rankSound.volume = 6; // nach Geschmack
-document.addEventListener('DOMContentLoaded', () => {
-    // „anwärmen“, damit es später sofort spielt
-    try { rankSound.load(); } catch (e) { }
-});
+function adjustScoreFont(el) {
+    if (!el) return;
+    const val = parseInt(el.textContent, 10) || 0;
+    el.classList.remove('small', 'tiny');
+    if (val >= 1000000) {
+        el.classList.add('tiny');   // ab 100k
+    } else if (val >= 10000) {
+        el.classList.add('small');  // ab 10k
+    }
+}
+
+
 
 function showTournamentModal(winnerTeamObj) {
     const modal = document.getElementById('tournament-modal');
@@ -680,11 +927,18 @@ function showTournamentModal(winnerTeamObj) {
     if (flagEl) flagEl.src = winnerTeamObj.flag || '';
     if (nameEl) nameEl.textContent = winnerTeamObj.name || '—';
 
+    try {
+        finalSound.currentTime = 0;
+        finalSound.play().catch(() => { });
+    } catch (e) { }
+
     // Top 3 (aus globalScores)
-    const top3 = Array.from(globalScores.entries())
+    // Top 3 (OVERALL)
+    const top3 = Array.from(overallScores.entries())
         .map(([id, v]) => ({ id, ...v }))
         .sort((a, b) => b.points - a.points)
         .slice(0, 3);
+
 
     const list = document.getElementById('modal-top3');
     if (list) {
@@ -706,7 +960,7 @@ function showTournamentModal(winnerTeamObj) {
 
                 const pts = document.createElement('span');
                 pts.className = 'points';
-                pts.textContent = `${u.points} P`;
+                pts.textContent = `${u.points} Punkte`;
 
                 li.appendChild(img);
                 li.appendChild(name);
@@ -718,10 +972,7 @@ function showTournamentModal(winnerTeamObj) {
 
     // anzeigen + Auto-Close
     modal.classList.remove('hidden');
-    try {
-        rankSound.currentTime = 0; // immer von vorn
-        rankSound.play().catch(() => { });
-    } catch (e) { }
+
     if (_winnerModalTimer) clearTimeout(_winnerModalTimer);
     _winnerModalTimer = setTimeout(hideTournamentModal, 10000); // 10s
 }

@@ -1,8 +1,8 @@
-// server.js
+// server.js - starten
 const WebSocket = require('ws');
 const { WebcastPushConnection } = require('tiktok-live-connector');
 
-const tiktokUsername = 'ccn.cards'; // ohne @
+const tiktokUsername = 'worldbattletv'; // ohne @
 
 // ⛳ Verbindung zu TikTok
 const tiktok = new WebcastPushConnection(tiktokUsername, {
