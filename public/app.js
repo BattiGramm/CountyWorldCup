@@ -16,6 +16,112 @@
         return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
     };
 
+    // ====== PERFORMANCE-PUFFER ======
+    const incomingQueue = [];
+    let pendingLeft = 0, pendingRight = 0;
+    let podiumDirty = false;
+    let countriesDelta = new Map(); // countryName -> +points
+
+    function enqueueEvent(e) { incomingQueue.push(e); }
+    window.enqueueEvent = enqueueEvent;
+    // Punkt dem aktuellen Team direkt (gepuffert) gutschreiben
+    function addBufferedPointsForTeamName(teamName, delta, userId = null, userName = '', avatarUrl = '') {
+        if (!pointsActive || !delta) return;
+        const isLeft = normTeam(teamName) === normTeam(currentLeftTeam);
+        const isRight = normTeam(teamName) === normTeam(currentRightTeam);
+        if (!isLeft && !isRight) return;
+
+        if (isLeft) pendingLeft += delta;
+        else if (isRight) pendingRight += delta;
+
+        // Runde & Overall in Memory erhöhen
+        if (userId) {
+            const key = String(userId).toLowerCase();
+            const base = { name: userName || userId, avatar: avatarUrl || '', points: 0 };
+
+            const r = perRoundScores.get(key) || { ...base };
+            r.points += delta; r.name ||= base.name; r.avatar ||= base.avatar;
+            perRoundScores.set(key, r);
+
+            const o = overallScores.get(key) || { ...base };
+            o.points += delta; o.name ||= base.name; o.avatar ||= base.avatar;
+            overallScores.set(key, o);
+
+            podiumDirty = true;
+        }
+
+        // Alltime-Länder gepuffert sammeln
+        const t = isLeft ? currentLeftTeam : currentRightTeam;
+        countriesDelta.set(t, (countriesDelta.get(t) || 0) + delta);
+    }
+
+    // Punkt für bereits gebundenen User (Like/Follow/Gift)
+    function addBufferedPointsForBoundUser(userId, delta, userName = '', avatarUrl = '') {
+        if (!pointsActive || !delta) return;
+        const sup = supporters.get(String(userId).toLowerCase());
+        if (!sup) return; // noch kein Team gewählt
+        addBufferedPointsForTeamName(sup.team, delta, userId, userName, avatarUrl);
+    }
+
+    // Pro Frame DOM aktualisieren
+    function applyPending() {
+        if (pendingLeft) {
+            const el = document.getElementById('score-left');
+            el.textContent = String((parseInt(el.textContent, 10) || 0) + pendingLeft);
+            adjustScoreFont(el);
+            pendingLeft = 0;
+        }
+        if (pendingRight) {
+            const el = document.getElementById('score-right');
+            el.textContent = String((parseInt(el.textContent, 10) || 0) + pendingRight);
+            adjustScoreFont(el);
+            pendingRight = 0;
+        }
+        if (podiumDirty) {
+            updatePodium();
+            podiumDirty = false;
+        }
+    }
+
+    // Main-Loop: Events abarbeiten + DOM einmal/Frame anfassen
+    function rafLoop() {
+        while (incomingQueue.length) {
+            const e = incomingQueue.shift();
+            if (e.type === 'chat') {
+                // Nutzer an Team binden + 1 Punkt (gepuffert)
+                pledgeUserToTeam(e.user, e.comment, e.nickname || e.user, e.avatar || '');
+                // Punkte für den Chat NICHT mehr in pledgeUserToTeam vergeben,
+                // sondern hier gepuffert:
+                const picked = e.comment.trim().toLowerCase();
+                if (picked === normTeam(currentLeftTeam)) addBufferedPointsForTeamName(currentLeftTeam, 1, e.user, e.nickname, e.avatar);
+                if (picked === normTeam(currentRightTeam)) addBufferedPointsForTeamName(currentRightTeam, 1, e.user, e.nickname, e.avatar);
+            } else if (e.type === 'like') {
+                addBufferedPointsForBoundUser(e.user, 1, e.nickname, e.avatar);
+            } else if (e.type === 'follow') {
+                addBufferedPointsForBoundUser(e.user, 5, e.nickname, e.avatar);
+            } else if (e.type === 'gift') {
+                addBufferedPointsForBoundUser(e.user, (e.coins || 0) * 10, e.nickname, e.avatar);
+            }
+        }
+        applyPending();
+        requestAnimationFrame(rafLoop);
+    }
+    requestAnimationFrame(rafLoop);
+
+    // Alle 2s: Alltime-Store + Top10 schreiben (einmal!)
+    setInterval(() => {
+        if (!countriesDelta.size) return;
+        const store = ensureAllCountriesInStore(loadAlltime());
+        for (const [name, delta] of countriesDelta) {
+            const key = String(name).trim().toUpperCase();
+            store[key] = (store[key] || 0) + delta;
+        }
+        countriesDelta.clear();
+        saveAlltime(store);
+        renderTop10Countries(store);
+    }, 2000);
+
+
     function render() {
         textEl.textContent = remaining <= 0 ? 'ENDE' : fmt(remaining);
     }
@@ -58,6 +164,160 @@
 
     window.matchTimer = { start, reset, get remaining() { return remaining; } };
 })();
+function updateStageHeader(round) {
+    const map = { qf: 'hdr-qf', sf: 'hdr-sf', final: 'hdr-final' };
+    ['hdr-qf', 'hdr-sf', 'hdr-final'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('stage-active', id === map[round]);
+    });
+}
+
+// === Streak-Persistenz ===
+const STREAK_CURR_KEY = 'cw_current_streak_v1';   // { team: 'DEUTSCHLAND', count: 2 }
+const STREAK_BEST_KEY = 'cw_best_streak_v1';      // { team: 'DEUTSCHLAND', count: 5 }
+
+function getCurrentStreak() {
+    try { return JSON.parse(localStorage.getItem(STREAK_CURR_KEY)) || { team: null, count: 0 }; }
+    catch { return { team: null, count: 0 }; }
+}
+
+function setCurrentStreak(obj) {
+    try { localStorage.setItem(STREAK_CURR_KEY, JSON.stringify(obj)); } catch { }
+}
+
+function getBestStreak() {
+    try { return JSON.parse(localStorage.getItem(STREAK_BEST_KEY)) || { team: null, count: 0 }; }
+    catch { return { team: null, count: 0 }; }
+}
+
+function maybeUpdateBestStreak(cur) {
+    const best = getBestStreak();
+    if (!cur || !cur.team || !cur.count) return;
+    if (cur.count > (best.count || 0)) {
+        try { localStorage.setItem(STREAK_BEST_KEY, JSON.stringify(cur)); } catch { }
+    }
+}
+
+function applyStreakBadges() {
+    const cur = getCurrentStreak();
+    const teamUpper = (cur.team || '').toUpperCase();
+    const count = cur.count || 0;
+
+    // Alle Team-Boxen abräumen
+    document.querySelectorAll('.team-box').forEach(box => {
+        box.querySelectorAll('.streak-badge').forEach(b => b.remove());
+        if (!teamUpper || count < 1) return;
+
+        const name = box.querySelector('span')?.textContent?.trim().toUpperCase();
+        if (name === teamUpper) {
+            const badge = document.createElement('div');
+            badge.className = 'streak-badge';
+            badge.innerHTML = `<span class="icon">🔥</span><span class="num">×${count}</span>`;
+            box.appendChild(badge);
+        }
+    });
+}
+
+
+// ===== Persistent Stats (localStorage) =====
+const META_KEY = 'cw_meta_v1';
+
+function loadMeta() {
+    try {
+        const raw = localStorage.getItem(META_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+}
+
+function saveMeta(meta) {
+    try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { }
+}
+
+/* Meta-Struktur (fallbacks):
+{
+  lastWinner: { name: "DEUTSCHLAND" },
+  roundRecord: { team: "TÜRKEI", points: 100000 },
+  currentStreak: { team: "DEUTSCHLAND", count: 2 },
+  longestStreak: { team: "DEUTSCHLAND", count: 2 }
+}
+*/
+function ensureMetaDefaults(m) {
+    if (!m.lastWinner) m.lastWinner = { name: "-" };
+    if (!m.roundRecord) m.roundRecord = { team: "-", points: 0 };
+    if (!m.currentStreak) m.currentStreak = { team: "-", count: 0 };
+    if (!m.longestStreak) m.longestStreak = { team: "-", count: 0 };
+    return m;
+}
+
+/* UI rendern */
+function renderStatsBar() {
+    const track = document.getElementById('stats-track');
+    if (!track) return;
+
+    const m = ensureMetaDefaults(loadMeta());
+    const htmlOnce = `
+    <div class="stat-box">
+      <div class="stat-icon">🏆</div>
+      <div class="stat-text">Letzter Sieger: <span class="val">${m.lastWinner.name}</span></div>
+    </div>
+
+    <div class="stat-box">
+      <div class="stat-icon">📈</div>
+      <div class="stat-text">Punkte-Rekord: <span class="val">${m.roundRecord.team}</span> — <span class="val-num">${(m.roundRecord.points || 0).toLocaleString('de-DE')}</span></div>
+    </div>
+
+    <div class="stat-box">
+      <div class="stat-icon">🔥</div>
+      <div class="stat-text">Längste Streak: <span class="val">${m.longestStreak.team}</span> — <span class="val-num">×${m.longestStreak.count || 0}</span></div>
+    </div>
+  `;
+
+    // Verdoppeln für nahtlose Schleife
+    track.innerHTML = htmlOnce + htmlOnce;
+}
+
+/* Nach Match-Ende: Rekord prüfen/setzen */
+function maybeUpdateRoundRecord() {
+    const leftScore = parseInt(document.getElementById('score-left')?.textContent ?? '0', 10) || 0;
+    const rightScore = parseInt(document.getElementById('score-right')?.textContent ?? '0', 10) || 0;
+    const leftTeam = document.getElementById('name-left')?.textContent?.trim() || '-';
+    const rightTeam = document.getElementById('name-right')?.textContent?.trim() || '-';
+
+    const maxPts = Math.max(leftScore, rightScore);
+    const maxTeam = (leftScore >= rightScore) ? leftTeam : rightTeam;
+
+    const meta = ensureMetaDefaults(loadMeta());
+    if (maxPts > (meta.roundRecord.points || 0)) {
+        meta.roundRecord = { team: maxTeam, points: maxPts };
+        saveMeta(meta);
+        renderStatsBar();
+    }
+}
+
+/* Nach Turnierende: Sieger + Streaks aktualisieren */
+function updateWinnerAndStreaks(winnerName) {
+    const meta = ensureMetaDefaults(loadMeta());
+    const w = (winnerName || '-').trim();
+
+    // Letzter Sieger
+    meta.lastWinner = { name: w };
+
+    // Streak fortführen oder neu beginnen
+    if (meta.currentStreak.team === w) {
+        meta.currentStreak.count = (meta.currentStreak.count || 0) + 1;
+    } else {
+        meta.currentStreak = { team: w, count: 1 };
+    }
+
+    // Längste Streak ggf. updaten
+    if ((meta.currentStreak.count || 0) > (meta.longestStreak.count || 0)) {
+        meta.longestStreak = { ...meta.currentStreak };
+    }
+
+    saveMeta(meta);
+    renderStatsBar();
+}
 
 
 // ======================= BRACKET-LOGIK =======================
@@ -100,6 +360,7 @@ const AVATAR_PLACEHOLDER =
 
 let ROUND_DURATION = 60; // Default 60 Sekunden
 let OVERTIME_DURATION = 30; // Default 30 Sekunden
+const FINAL_EXTRA_SECONDS = 30; // Finale hat +30s gegenüber der normalen Rundenzeit
 
 const startCue = new Audio('assets/startsound2.mp3');
 startCue.preload = 'auto';
@@ -204,6 +465,7 @@ function setTeamInCol(colClass, index, team) {
     const box = col.children[index];
     if (!box) return;
     box.innerHTML = `<img src="${team.flag}" alt="${team.alt}"><span>${team.name}</span>`;
+    applyStreakBadges();
 }
 
 function setArena(leftTeam, rightTeam, leftScore, rightScore) {
@@ -276,15 +538,6 @@ function pledgeUserToTeam(userId, rawText, userName = '', avatarUrl = '') {
             team: chosen,
             points: (supporters.get(key)?.points || 0)
         });
-
-        // 1 Punkt für den Chat selbst
-        addPointToTeam(chosen); // Team-Score + Alltime-Country bleibt wie gehabt
-
-        // ➕ Punkte an beide Töpfe (Runde + Overall)
-        awardPoints(userId, 1, userName, avatarUrl);
-
-
-        updatePodium();
     }
 }
 
@@ -382,6 +635,8 @@ function applyGiftFromUser(userId, coins, userName = '', avatarUrl = '') {
 
 
 function startMatch(round, matchIndex) {
+    updateStageHeader(round);
+
     currentRound = round;
     currentMatchIndex = matchIndex;
 
@@ -423,7 +678,9 @@ function startMatch(round, matchIndex) {
                 setPhase("LOS!", 1, () => {
                     pointsActive = true;
                     textEl.classList.remove("phase-text");
-                    window.matchTimer.reset(ROUND_DURATION);
+                    const extra = (round === 'final') ? FINAL_EXTRA_SECONDS : 0;
+                    window.matchTimer.reset(ROUND_DURATION + extra);
+
                     window.matchTimer.start();
                 });
             });
@@ -436,6 +693,7 @@ window.addEventListener('match:end', (ev) => {
     const leftScore = parseInt(document.getElementById('score-left')?.textContent ?? '0', 10) || 0;
     const rightScore = parseInt(document.getElementById('score-right')?.textContent ?? '0', 10) || 0;
 
+    maybeUpdateRoundRecord();
     // 1️⃣ Overtime prüfen (nur wenn noch nicht gespielt)
     if (leftScore === rightScore && !window.overtimePlayed) {
         window.overtimePlayed = true; // merken, dass Overtime gespielt wird
@@ -536,9 +794,31 @@ window.addEventListener('match:end', (ev) => {
                 startMatch('final', 0);
             }
         } else if (currentRound === 'final') {
-            // Turnier Ende → Modal anzeigen (bleibt stehen bis du neu startest)
+            // Gewinner bestimmen (du hast 'winner' oben schon)
+            const winnerNow = getWinnerFromArena(); // { name, flag, ... }
+
+            // 1) aktuelle Streak updaten
+            const cur = getCurrentStreak();
+            let nextCur;
+            if (cur.team && cur.team.toUpperCase() === (winnerNow.name || '').toUpperCase()) {
+                nextCur = { team: cur.team, count: (cur.count || 0) + 1 };
+            } else {
+                nextCur = { team: winnerNow.name, count: 1 };
+            }
+            setCurrentStreak(nextCur);
+
+            // 2) Best-Streak ggf. anheben
+            maybeUpdateBestStreak(nextCur);
+            updateWinnerAndStreaks(winnerNow.name);
+
+            // 3) Badges im Bracket aktualisieren
+            applyStreakBadges();
+
+            // Dann dein bestehendes Modal zeigen
             showTournamentModal(getWinnerFromArena());
         }
+
+
     }, 7500);
 
 
@@ -614,7 +894,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // initiale Länderliste sicherstellen
     saveAlltime(ensureAllCountriesInStore(loadAlltime()));
     renderTop10Countries();
+    renderStatsBar();
+    applyStreakBadges();
 });
+// <- Deine Standard-Auswahl (in genau den Namen wie in allCountries)
+const DEFAULT_TEAMS = [
+    "DEUTSCHLAND",
+    "RUSSLAND",
+    "POLEN",
+    "TÜRKEI",
+    "SCHWEIZ",
+    "ÖSTERREICH",
+    "ALBANIEN",
+    "KOSOVO"
+];
+
+// Option im <select> sicherstellen und setzen
+function prefillSelect(selectEl, countryName) {
+    const found = allCountries.find(c => c.name === countryName);
+    if (!found) return;
+    let opt = [...selectEl.options].find(o => o.value === found.name);
+    if (!opt) {
+        opt = document.createElement('option');
+        opt.value = found.name;
+        opt.textContent = found.name;
+        selectEl.appendChild(opt);
+    }
+    selectEl.value = found.name;
+}
 
 
 // ====== Länderliste (Name + Flag-Pfad) ======
@@ -853,23 +1160,67 @@ function makeSearchableSelect(selectEl, data /* array {name, flag} */) {
         if (found) pill.innerHTML = `<img src="${found.flag}" alt=""><span>${found.name}</span>`;
     }
 }
+function startTournamentFromPanel() {
+    const roundTimeInput = document.getElementById('round-time');
+    const overtimeTimeInput = document.getElementById('overtime-time');
+
+    ROUND_DURATION = parseInt(roundTimeInput?.value, 10) || 60;
+    OVERTIME_DURATION = parseInt(overtimeTimeInput?.value, 10) || 30;
+
+    const selects = document.querySelectorAll('.country-input');
+    let chosen = [];
+    selects.forEach(sel => {
+        const c = allCountries.find(x => x.name === sel.value);
+        if (c) chosen.push(c);
+    });
+
+    if (chosen.length !== 8) { alert('Bitte 8 Länder auswählen!'); return; }
+
+    const set = new Set(chosen.map(c => c.name));
+    if (set.size !== 8) { alert('Bitte 8 unterschiedliche Länder wählen!'); return; }
+
+    // ggf. mischen
+    const shuffleCB = document.getElementById('shuffle');
+    if (shuffleCB?.checked) chosen = shuffleArray(chosen);
+
+    // Bracket neu aufbauen
+    setQfTeams(chosen);
+    ['sf', 'final'].forEach(col => {
+        const el = getCol(col); if (!el) return;
+        [...el.children].forEach(box => box.innerHTML = `<span>—</span>`);
+    });
+    applyStreakBadges();
+
+    // Reset
+    document.querySelectorAll('.team-box.winner').forEach(n => n.classList.remove('winner'));
+    hideTournamentModal();
+    overallScores.clear();
+
+    // Start bei VF Match 0
+    startMatch('qf', 0);
+}
 
 // Control Panel initialisieren
 function setupControlPanel() {
     const selects = document.querySelectorAll('.country-input');
     const shuffleCB = document.getElementById('shuffle');
     const startBtn = document.getElementById('start-tournament');
-
     if (!selects.length || !startBtn) return;
 
-    // >>> NEU: für jedes Select eine Such-Combo oberhalb aufbauen
+    // 1) Default-Teams in die 8 Selects schreiben
+    selects.forEach((sel, idx) => {
+        const defName = DEFAULT_TEAMS[idx];
+        if (defName) prefillSelect(sel, defName);
+    });
+
+    // 2) Danach die Such-Combos erzeugen (die Pill zeigt dann direkt die Defaults)
     selects.forEach(sel => {
-        // Stelle sicher, dass allCountries die Flag-Pfade kennt (dein Array schon vorhanden)
         makeSearchableSelect(sel, allCountries);
     });
 
-    // Start-Button bleibt unverändert – liest select.value!
+    // 3) Dein bestehender Start-Button-Code bleibt wie er ist …
     startBtn.addEventListener('click', () => {
+        // ... unverändert
         const roundTimeInput = document.getElementById('round-time');
         const overtimeTimeInput = document.getElementById('overtime-time');
 
@@ -894,6 +1245,7 @@ function setupControlPanel() {
             const el = getCol(col); if (!el) return;
             [...el.children].forEach(box => box.innerHTML = `<span>—</span>`);
         });
+        applyStreakBadges();
 
         document.querySelectorAll('.team-box.winner').forEach(n => n.classList.remove('winner'));
         hideTournamentModal();
@@ -901,6 +1253,7 @@ function setupControlPanel() {
         startMatch('qf', 0);
     });
 }
+
 
 
 let _winnerModalTimer = null;
@@ -974,7 +1327,19 @@ function showTournamentModal(winnerTeamObj) {
     modal.classList.remove('hidden');
 
     if (_winnerModalTimer) clearTimeout(_winnerModalTimer);
-    _winnerModalTimer = setTimeout(hideTournamentModal, 10000); // 10s
+    _winnerModalTimer = setTimeout(() => {
+        // Modal schließen
+        hideTournamentModal();
+
+        // ⬇️ Autorun: wenn Checkbox aktiv, direkt neues Turnier starten
+        const autorun = document.getElementById('autorun');
+        if (autorun?.checked) {
+            setTimeout(() => {
+                startTournamentFromPanel();
+            }, 200); // mini-Pause nach dem Ausblenden
+        }
+    }, 10000); // 10s Anzeige
+
 }
 
 function hideTournamentModal() {
@@ -990,27 +1355,23 @@ function hideTournamentModal() {
 updatePodium();
 setupControlPanel();
 // ======================= VERBINDUNG ZUM WEBSOCKET SERVER =======================
+// ======================= VERBINDUNG ZUM WEBSOCKET SERVER =======================
 const ws = new WebSocket('ws://localhost:8080');
 
 ws.addEventListener('message', (event) => {
     try {
         const msg = JSON.parse(event.data);
-
-        if (msg.type === 'chat') {
-            if (!pointsActive) return;
-            pledgeUserToTeam(msg.user, msg.comment, msg.nickname || msg.user, msg.avatar || '');
-
-        } else if (msg.type === 'gift') {
-            applyGiftFromUser(msg.user, Number(msg.coins) || 0, msg.nickname || msg.user, msg.avatar || '');
-
-        } else if (msg.type === 'like') {
-            applyLikeFromUser(msg.user, msg.nickname || msg.user, msg.avatar || '');
-
-        } else if (msg.type === 'follow') {
-            applyFollowFromUser(msg.user, msg.nickname || msg.user, msg.avatar || '');
+        if (msg.type === 'batch' && Array.isArray(msg.events)) {
+            msg.events.forEach(enqueueEvent);
+        } else {
+            window.enqueueEvent(msg);
         }
-
     } catch (e) {
         console.warn('WS parse error:', e);
     }
+});
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateStageHeader('qf'); // optional, nur für initiale Markierung
 });

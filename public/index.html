@@ -42,6 +42,7 @@
 
         <div class="cp-actions">
             <label><input type="checkbox" id="shuffle"> Zufällig verteilen</label>
+            <label><input type="checkbox" id="autorun"> Autorun</label>
             <button id="start-tournament">Start</button>
         </div>
         <button id="music-toggle" class="music-toggle" aria-pressed="false" title="Musik an/aus">🎵 Musik</button>
@@ -111,6 +112,12 @@
                 </div>
             </div>
         </div>
+        <!-- ===== Laufende Stats (rechts scrollend) ===== -->
+<section class="statsbar" aria-label="Turnier-Statistiken">
+  <div class="stats-track" id="stats-track">
+    <!-- JS füllt drei Karten und dupliziert sie fürs Endlos-Scrollen -->
+  </div>
+</section>
 
 
 
@@ -118,10 +125,11 @@
         <!-- Bracket (ohne Linien) -->
         <section class="bracket">
             <div class="bracket-header">
-                <div>VIERTELFINALE</div>
-                <div>HALBFINALE</div>
-                <div>FINALE</div>
-            </div>
+  <div id="hdr-qf">VIERTELFINALE</div>
+  <div id="hdr-sf">HALBFINALE</div>
+  <div id="hdr-final">FINALE</div>
+</div>
+
 
             <div class="bracket-body">
                 <!-- Spalte: Viertelfinale (8) -->

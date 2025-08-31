@@ -156,7 +156,7 @@ body {
    Kinder in einer Reihe (links Card – Timer – rechts Card) */
 .battle_arena {
     position: absolute;
-    top: 370px;
+    top: 340px;
     /* wo die Arena beginnen soll – anpassen, wenn nötig */
     left: 0;
     width: 100%;
@@ -1347,4 +1347,169 @@ body {
 .left_card .Infos_right {
     flex: 1 1 auto;
     min-width: 0;
+}
+
+/* Standard (bleibt) */
+.bracket-header > div {
+  color:#9adfff;
+  text-shadow:0 0 10px rgba(0,183,255,.6);
+  transition: color .2s ease, text-shadow .2s ease, transform .2s ease;
+}
+
+/* Aktive Stage: gelb + Glow — höhere Spezifität */
+.bracket-header > div.stage-active {
+  color:#fed44a;
+  text-shadow:
+    0 0 10px rgba(255,211,92,.85),
+    0 0 20px rgba(255,211,92,.65),
+    0 0 36px rgba(255,211,92,.45);
+  transform: scale(1.04);
+}
+
+:root{
+  /* Position zwischen Arena (top ~370) und Bracket (top ~760) */
+  --stats-top: 680px;
+  --stats-width: 1000px;
+  --stats-height: 90px;
+}
+
+/* Container wie rulesbar, aber eigener Platz */
+.statsbar{
+  position:absolute;
+  top:var(--stats-top);
+  left:50%;
+  transform:translateX(-50%);
+  width:var(--stats-width);
+  height:var(--stats-height);
+  overflow:hidden;        /* wichtig fürs Marquee */
+  z-index:2;
+  pointer-events:none;
+}
+
+/* Track läuft von links nach rechts */
+.stats-track{
+  display:inline-flex;
+  align-items:center;
+  gap:18px;
+  will-change:transform;
+  animation: stats-scroll 24s linear infinite;
+}
+
+/* Rechtslauf: von -50% -> 0% (d. h. nach rechts) */
+@keyframes stats-scroll{
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0%); }
+}
+
+/* Karten-Optik wie deine Team-Boxen */
+
+
+/* Glow-Layer wie team-box */
+.stat-box::after{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  border-radius:14px;
+  background:
+    radial-gradient(120% 120% at 10% 10%, rgba(44,195,255,.18), transparent 60%),
+    radial-gradient(120% 120% at 90% 90%, rgba(44,195,255,.12), transparent 60%);
+  filter: blur(8px);
+  z-index:-1;
+}
+
+/* Icon-Feld links */
+.stat-icon{
+  width:56px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  font-size:22px;
+  line-height:1;
+  border-radius:8px;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.15), rgba(0,183,255,.18));
+  outline:1px solid rgba(255,255,255,.12);
+  box-shadow:0 4px 12px rgba(0,0,0,.35);
+}
+
+/* --- Stats-Karten flexibler & ohne Abschneiden --- */
+.stat-box{
+  /* statt fixer Breite -> passt sich Inhalt an */
+  width: auto;
+  min-width: 260px;
+  height: 64px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 2px solid rgba(44,195,255,.55);
+  box-shadow: 0 0 14px rgba(44,195,255,.22);
+  background: rgba(10,20,40,.18);
+  display: grid;
+  grid-template-columns: 56px auto; /* Icon fix, Text wächst */
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  position: relative;
+}
+
+.stat-text{
+  font-family:'Poppins',sans-serif;
+  font-weight:800;
+  font-size:16px;
+  letter-spacing:.04em;
+  color:#e7f1ff;
+  white-space:nowrap;     /* alles in einer Zeile */
+  overflow: visible;      /* nichts abschneiden */
+  text-overflow: clip;    /* keine Ellipsis */
+}
+
+/* Gold-Glow für Zahlen/Werte */
+.val-num{
+  color:#fed44a;
+  text-shadow:
+    0 0 10px rgba(255,211,92,.85),
+    0 0 20px rgba(255,211,92,.65),
+    0 0 36px rgba(255,211,92,.45);
+}
+
+/* Optional: Zahlen beim Punkte-Rekord auch als .val-num markieren */
+.stat-text .val{
+  color:#ffe38a;
+}
+
+/* Streak-Badge unten rechts, leicht überlappend */
+.team-box {
+  position: relative;
+}
+
+.streak-badge{
+  position: absolute;
+  right: -10px;
+  bottom: -10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 40% 35%, #ffefb0, #ffd365 55%, #ffb84a 100%);
+  border: 2px solid #ffe38a;
+  box-shadow:
+    0 0 10px rgba(255,191,62,.55),
+    0 0 20px rgba(255,191,62,.35);
+  display: grid;
+  place-items: center;
+  z-index: 3;
+}
+
+.streak-badge .icon{
+  position: absolute;
+  top: -10px; /* Flamme ragt leicht raus */
+  font-size: 20px;
+  line-height: 1;
+}
+
+.streak-badge .num{
+  font-family: 'Poppins', sans-serif;
+  font-weight: 900;
+  font-size: 20px;
+  color: #aa2b2b;
+  text-shadow:
+    0 0 6px rgba(255,215,0,.85),
+    0 0 14px rgba(255,215,0,.6);
 }
