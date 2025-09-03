@@ -1,4 +1,4 @@
-// ======================= TIMER-MODUL =======================
+// ======================= TIMER-MODUL ======================= starten mit: npx http-server public -p 8081 -c-1
 (function () {
     const timerEl = document.getElementById('timer');
     const textEl = document.getElementById('timer-text');

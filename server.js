@@ -1,4 +1,4 @@
-// server.js - starten
+// server.js - starten mit node server.js
 const WebSocket = require('ws');
 const { WebcastPushConnection } = require('tiktok-live-connector');
 
